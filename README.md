@@ -370,9 +370,8 @@
 代码使用**多 CDN 回退**加载 Three.js，按顺序尝试：
 
     1. cdn.jsdelivr.net
-    2. raw.githubusercontent.com
-    3. unpkg.com
-    4. esm.sh
+    2. unpkg.com
+    3. esm.sh
 
 任一加载成功即停止。全部失败会显示错误提示。
 
