@@ -58596,40 +58596,32 @@ const HUD = {
   slotEls: [], iconCache: new Map(),
   debugOn: false, itemTimer: 0, lastHealth: -1, lastFood: -1, lastBreath: -1,
   dbgTimer: 0, fpsSmooth: 60, fpsAcc: 0, fpsFrames: 0,
-  // 触屏长按丢出状态
-  _pressSlot: -1, _pressTimer: 0, _repeatTimer: 0, _pressActive: false,
+  // 触屏三击丢出状态
+  _tapSlot: -1,      // 当前正在连击的槽位
+  _tapCount: 0,      // 已点击次数
+  _tapTimer: 0,      // 上次点击时间戳
 
-  /** 触屏长按某格：开始计时 */
-  beginLongPress(slotIndex) {
-    this._pressSlot = slotIndex;
-    this._pressActive = true;
-    this._pressTimer = 0;
-    this._repeatTimer = 0;
-  },
-  /** 结束长按（松手 / 移出 / 界面打开） */
-  endLongPress() {
-    this._pressActive = false;
-    this._pressSlot = -1;
-    this._pressTimer = 0;
-    this._repeatTimer = 0;
-  },
-  /** 每帧调用：500ms 后首次丢出，之后每 250ms 丢 1 个 */
-  updateLongPress(dt) {
-    if (!this._pressActive || this._pressSlot < 0) return;
-    if (!Game.running || Game.paused || Game.uiOpen) { this.endLongPress(); return; }
-    this._pressTimer += dt;
-    if (this._pressTimer >= 0.5) {
-      this._repeatTimer += dt;
-      if (this._repeatTimer === 0 || this._repeatTimer >= 0.25) {
-        this._repeatTimer = 0;
-        this.dropOneFromSlot(this._pressSlot);
-      }
+  /** 触屏点击某格：累计 3 次后丢出 1 个物品 */
+  onSlotTap(slotIndex) {
+    const now = performance.now();
+    // 换格子、或距上次点击超过 400ms，重新计数
+    if (slotIndex !== this._tapSlot || now - this._tapTimer > 400) {
+      this._tapCount = 0;
+      this._tapSlot = slotIndex;
+    }
+    this._tapTimer = now;
+    this._tapCount++;
+    if (this._tapCount >= 3) {
+      this._tapCount = 0;
+      this.dropOneFromSlot(slotIndex);
+    } else {
+      SFX.play('click', 'wood', 0.35);   // 前两下给个轻响
     }
   },
   /** 从指定快捷栏格丢出 1 个物品（保留耐久） */
   dropOneFromSlot(slotIndex) {
     const s = Player.inv[slotIndex];
-    if (!s || s.count <= 0) { this.endLongPress(); return; }
+    if (!s || s.count <= 0) return;
     const dir = Player.lookDir(new THREE.Vector3());
     Drops.spawnStack(
       { id: s.id, count: 1, dur: s.dur },
@@ -58655,13 +58647,13 @@ const HUD = {
       const num = document.createElement('span'); num.className = 'num'; num.textContent = String(i + 1);
       d.appendChild(num);
       // 桌面：快捷栏只做显示，用 1-9 / 滚轮切换，不响应鼠标点击
-      // 触屏：点击切换 + 长按丢出
+      // 触屏：点击切换 + 三击丢出
       d.addEventListener('touchstart', (e) => {
         if (!Touch.enabled) return;
         e.preventDefault();
         e.stopPropagation();
         this.setSlot(i);
-        this.beginLongPress(i);
+        this.onSlotTap(i);
       }, { passive: false });
       hb.appendChild(d);
       this.slotEls.push(d);
@@ -58673,30 +58665,10 @@ const HUD = {
       const a = document.createElement('div'); a.className = 'ico'; hp.appendChild(a);
       const b = document.createElement('div'); b.className = 'ico'; fp.appendChild(b);
     }
-        this.refreshHotbar();
+    this.refreshHotbar();
     this.updateStats(true);
+  },
 
-    // 触屏：松手 / 取消 → 结束长按
-    window.addEventListener('touchend', () => this.endLongPress());
-    window.addEventListener('touchcancel', () => this.endLongPress());
-    // 触屏：手指移出槽位 → 结束长按
-    for (const el of this.slotEls) {
-      el.addEventListener('touchmove', (e) => {
-        if (!this._pressActive) return;
-        const r = el.getBoundingClientRect();
-        const t = e.changedTouches[0];
-        if (t && (t.clientX < r.left || t.clientX > r.right || t.clientY < r.top || t.clientY > r.bottom)) {
-          this.endLongPress();
-        }
-      }, { passive: true });
-    }
-  },
-  blockIcon(blockId, size) {
-    const key = blockId + '_' + size;
-    let cv = this.iconCache.get(key);
-    if (!cv) { cv = makeBlockIcon(blockId, size); this.iconCache.set(key, cv); }
-    return cv;
-  },
   /** 物品/方块图标（返回新 canvas，可直接插入 DOM） */
   itemIcon(id, size) {
     if (!id) { const c = document.createElement('canvas'); c.width = c.height = size; return c; }
@@ -59850,7 +59822,6 @@ const Game = {
             Input.consumeMouseDelta();       // 界面打开：丢弃鼠标增量，避免视角跳动
           }
           HUD.update(dt);
-          HUD.updateLongPress(dt);
           this.autosaveTimer += dt;
         } else {
           // 暂停（Esc 菜单）时仍然刷新 FPS 与界面
