@@ -53950,6 +53950,11 @@ defTile('bed_side', (c, ox, oy, rnd) => {
   c.fillStyle = rgb8(112, 84, 48); c.fillRect(ox, oy + 11, 16, 5);
   c.fillStyle = rgb8(140, 106, 62); c.fillRect(ox, oy + 10, 16, 1);
 });
+defTile('boat_wood', (c, ox, oy, rnd) => {
+  noiseFill(c, ox, oy, rnd, [158, 122, 74], 10);
+  for (let p = 0; p < 4; p++) for (let x = 0; x < 16; x++) pset(c, ox, oy, x, p * 4, rgb8(112, 84, 48));
+  speckle(c, ox, oy, rnd, rgb8(130, 96, 52), 20);
+});
 defTile('stone_bricks', (c, ox, oy, rnd) => {
   noiseFill(c, ox, oy, rnd, [126, 126, 126], 9);
   c.fillStyle = rgb8(92, 92, 92);
@@ -54068,6 +54073,21 @@ itemTile('flint', (c, ox, oy, rnd) => {
     const px = rows[i][0] + x, py = 5 + i;
     pset(c, ox, oy, px, py, (i < 2 || x === 0) ? '#6e6e72' : (i > 5 ? '#2e2e32' : '#4a4a50'));
   }
+});
+itemTile('boat', (c, ox, oy, rnd) => {
+  for (let y = 9; y < 13; y++) {
+    const off = 2 + (12 - y);
+    for (let x = 0; x < 12; x++) {
+      pset(c, ox, oy, off + x, y, y === 9 ? '#8a5a2e' : (y === 12 ? '#5e3d1c' : '#a9743e'));
+    }
+  }
+  for (let x = 3; x < 13; x++) {
+    pset(c, ox, oy, x, 6, '#a9743e');
+    pset(c, ox, oy, x, 7, '#8a5a2e');
+    pset(c, ox, oy, x, 8, '#6b4a22');
+  }
+  pset(c, ox, oy, 2, 5, '#6b4a22'); pset(c, ox, oy, 2, 6, '#8a5a2e');
+  pset(c, ox, oy, 13, 5, '#6b4a22'); pset(c, ox, oy, 13, 6, '#8a5a2e');
 });
 itemTile('bow', (c, ox, oy, rnd) => {
   for (let i = 0; i < 12; i++) {
@@ -55537,6 +55557,7 @@ const Player = {
   hurtCooldown: 0, regenTimer: 0, starveTimer: 0, drownTimer: 0, lavaTimer: 0,
   walkDist: 0,
   lastBlock: 0,
+  spawnPoint: null,
   reset(x, y, z) {
     this.pos.set(x, y, z); this.vel.set(0, 0, 0);
     this.health = 20; this.food = 20; this.breath = 10; this.saturation = 5;
@@ -55734,12 +55755,18 @@ const Player = {
     this.food = this.maxFood;
     this.breath = this.maxBreath;
     this.saturation = 5;
-    const x = Math.floor(this.pos.x), z = Math.floor(this.pos.z);
-    let y = 0;
-    for (let yy = CFG.chunkY - 1; yy > 0; yy--) { const b = World.getBlock(x, yy, z); if (b !== 0 && !BLOCKS[b].liquid) { y = yy + 1; break; } }
-    this.pos.set(x + 0.5, Math.max(y, 4) + 0.1, z + 0.5);
+    // 死亡后回到出生点
+    const sp = this.spawnPoint || new THREE.Vector3(8.5, 100, 8.5);
+    const sx = Math.floor(sp.x), sz = Math.floor(sp.z);
+    let sy = 0;
+    for (let yy = CFG.chunkY - 1; yy > 0; yy--) {
+      const b = World.getBlock(sx, yy, sz);
+      if (b !== 0 && !BLOCKS[b].liquid) { sy = yy + 1; break; }
+    }
+    this.pos.set(sp.x, Math.max(sy, 4) + 0.1, sp.z);
     this.vel.set(0, 0, 0);
     this.fallStart = null;
+    toast('已回到出生点', 1800);
     if (UI.invOpen || UI.furnaceOpen) UI.closeAll();
   },
   eyePos(out) {
@@ -55882,6 +55909,7 @@ function raycastVoxel(origin, dir, maxDist) {
 const Interaction = {
   target: null,
   mobTarget: null,
+  boatTarget: null,
   breakProgress: 0,
   breakKey: '',
   digSoundTimer: 0,
@@ -55900,8 +55928,13 @@ const Interaction = {
     const mh = (Game.running && !Game.paused)
       ? Mobs.raycast(_rayOrigin.x, _rayOrigin.y, _rayOrigin.z, _rayDir.x, _rayDir.y, _rayDir.z, Player.reach)
       : null;
-    const useMob = mh && (!r.hit || mh.dist < r.dist);
+    const bh = (Game.running && !Game.paused)
+      ? Boats.raycast(_rayOrigin.x, _rayOrigin.y, _rayOrigin.z, _rayDir.x, _rayDir.y, _rayDir.z, Player.reach)
+      : null;
+    const useBoat = bh && (!r.hit || bh.dist < r.dist) && (!mh || bh.dist < mh.dist);
+    const useMob = mh && (!r.hit || mh.dist < r.dist) && !useBoat;
     this.mobTarget = useMob ? mh.mob : null;
+    this.boatTarget = useBoat ? bh.boat : null;
     const key = r.hit ? (r.x + ',' + r.y + ',' + r.z) : '';
     if (key !== this.breakKey) { this.breakKey = key; this.breakProgress = 0; }
     this.target = r.hit ? r : null;
@@ -55972,7 +56005,14 @@ const Interaction = {
     this.swing += dt * speed;
   },
   handleRight(dt, busy) {
-    if (!Input.mouse.right || !busy) { this.eatTime = 0; return; }
+  if (!Input.mouse.right || !busy) { this.eatTime = 0; return; }
+    // 上船
+  if (this.boatTarget) {
+      Boats.mount(this.boatTarget);
+      this.placeCooldown = 0.3;
+      this.boatTarget = null;
+      return;
+    }
     const s = Inv.held();
     if (s && s.id === I.bow) {
       if ((this.bowCooldown || 0) > 0) return;
@@ -56047,6 +56087,7 @@ const Interaction = {
     Game.sleeping = true;
     Game.sleepFrom = Sky.time;
     Game.sleepProgress = 0;
+    Player.spawnPoint = Player.pos.clone();
     SFX.play('sleep', 'dirt', 0.9);
     toast('晚安…', 1400);
   },
@@ -56097,6 +56138,12 @@ const Interaction = {
     if (ny < 0 || ny >= CFG.chunkY) return;
     const cur = World.getBlock(nx, ny, nz);
     if (cur !== 0 && !BLOCKS[cur].liquid) return;
+	if (id === I.boat) {
+      Boats.spawn(nx + 0.5, ny + 0.3, nz + 0.5, Player.yaw, true);
+      this.placeCooldown = 0.3;
+      if (Player.mode !== 'creative') Inv.consumeSel(1);
+      return;
+    }
     if (id === B.bed) {
       const fx = -Math.sin(Player.yaw), fz = -Math.cos(Player.yaw);
       let dx = 0, dz = 0;
@@ -56164,6 +56211,7 @@ defItem('leather', '皮革', T.item_leather);
 defItem('arrow', '箭', T.item_arrow);
 defItem('flint', '燧石', T.item_flint);
 defItem('bow', '弓', T.item_bow, { stack: 1, durability: 160, dmg: 1 });
+defItem('boat', '船', T.item_boat, { stack: 1 });
 defItem('bread', '面包', T.item_bread, { food: 5 });
 defItem('golden_apple', '金苹果', T.item_golden_apple, { food: 6, heal: 4 });
 defItem('raw_porkchop', '生猪排', T.item_raw_porkchop, { food: 3 });
@@ -56351,7 +56399,8 @@ const RECIPES = [
   { out: [I.diamond, 9], sh: [[B.diamond_block, 1]] },
   { out: [I.golden_apple, 1], pat: ['GGG', 'GAG', 'GGG'], key: { G: I.gold_ingot, A: I.apple } },
   { out: [I.bow, 1], pat: [' SB', 'S B', ' SB'], key: { S: I.stick, B: I.string } },
-  { out: [I.arrow, 4], pat: ['F', 'S', 'B'], key: { F: I.flint, S: I.stick, B: I.feather } }
+  { out: [I.arrow, 4], pat: ['F', 'S', 'B'], key: { F: I.flint, S: I.stick, B: I.feather } },
+  { out: [I.boat, 1], pat: ['P P', 'PPP'], key: { P: B.planks } }
 ];
 const Craft = {
   grid: new Array(9).fill(null),
@@ -57021,6 +57070,165 @@ const Arrows = {
     }
   },
   clear() { for (const a of this.list) scene.remove(a.mesh); this.list.length = 0; }
+};
+
+/* ======================= 15.85 船 ======================================= */
+const Boats = {
+  list: [],
+  geo: null, mat: null,
+  riding: null,
+  makeGeo() {
+    const parts = [];
+    const push = (w, h, d, x, y, z, tileIdx) => {
+      const g = blockBoxGeometry({ tiles: [tileIdx, tileIdx, tileIdx] }, 1);
+      g.scale(w, h, d);
+      g.translate(x, y, z);
+      addVoxelAttrs(g, 1, 0, 1);
+      parts.push(g);
+    };
+    const wood = T.boat_wood;
+    push(1.6, 0.15, 0.7, 0, -0.25, 0, wood);
+    push(1.6, 0.32, 0.12, 0, 0, -0.42, wood);
+    push(1.6, 0.32, 0.12, 0, 0, 0.42, wood);
+    push(0.12, 0.32, 0.8, -0.78, 0, 0, wood);
+    push(0.12, 0.32, 0.8, 0.78, 0, 0, wood);
+    let total = 0;
+    for (const g of parts) total += g.attributes.position.count;
+    const pos = new Float32Array(total * 3);
+    const uv = new Float32Array(total * 2);
+    const lit = new Float32Array(total * 2);
+    const shd = new Float32Array(total);
+    const wav = new Float32Array(total);
+    let off = 0;
+    for (const g of parts) {
+      pos.set(g.attributes.position.array, off * 3);
+      uv.set(g.attributes.uv.array, off * 2);
+      lit.set(g.attributes.aLight.array, off * 2);
+      shd.set(g.attributes.aShade.array, off);
+      wav.set(g.attributes.aWave.array, off);
+      off += g.attributes.position.count;
+      g.dispose();
+    }
+    const out = new THREE.BufferGeometry();
+    out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    out.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    out.setAttribute('aLight', new THREE.BufferAttribute(lit, 2));
+    out.setAttribute('aShade', new THREE.BufferAttribute(shd, 1));
+    out.setAttribute('aWave', new THREE.BufferAttribute(wav, 1));
+    return out;
+  },
+  spawn(x, y, z, yaw, fromPlayer) {
+    if (!this.geo) {
+      this.geo = this.makeGeo();
+      this.mat = voxelMaterial({ side: THREE.FrontSide, uniforms: { uAlphaTest: { value: 0.5 } } });
+    }
+    const mesh = new THREE.Mesh(this.geo, this.mat);
+    mesh.position.set(x, y, z);
+    scene.add(mesh);
+    const b = {
+      pos: new THREE.Vector3(x, y, z),
+      vel: new THREE.Vector3(),
+      yaw: yaw || 0,
+      mesh: mesh,
+      onGround: false,
+      inWater: false,
+      lightTimer: Math.random() * 0.4
+    };
+    this.list.push(b);
+    if (fromPlayer) SFX.play('place', 'wood', 1.0);
+    return b;
+  },
+  remove(b) {
+    const i = this.list.indexOf(b);
+    if (i >= 0) this.list.splice(i, 1);
+    if (this.riding === b) this.riding = null;
+    scene.remove(b.mesh);
+  },
+  mount(b) {
+    this.riding = b;
+    toast('已上船（Shift 下船）', 1400);
+  },
+  dismount() {
+    if (!this.riding) return;
+    const b = this.riding;
+    Player.pos.set(b.pos.x + Math.cos(b.yaw) * 1.2, b.pos.y + 0.2, b.pos.z - Math.sin(b.yaw) * 1.2);
+    Player.vel.set(0, 0, 0);
+    this.riding = null;
+    toast('已下船', 1200);
+  },
+  update(dt) {
+    if (this.riding && Input.key('ShiftLeft')) this.dismount();
+    for (const b of this.list) {
+      const below = World.getBlock(Math.floor(b.pos.x), Math.floor(b.pos.y - 0.4), Math.floor(b.pos.z));
+      b.inWater = below !== 0 && BLOCKS[below].liquid;
+      if (this.riding === b) {
+        const fwd = (Input.key('KeyW') ? 1 : 0) - (Input.key('KeyS') ? 1 : 0);
+        const str = (Input.key('KeyD') ? 1 : 0) - (Input.key('KeyA') ? 1 : 0);
+        if (str !== 0) b.yaw -= str * dt * 1.6;
+        const spd = 5.5;
+        const dx = -Math.sin(b.yaw) * fwd * spd;
+        const dz = -Math.cos(b.yaw) * fwd * spd;
+        b.vel.x = lerp(b.vel.x, dx, clamp(6 * dt, 0, 1));
+        b.vel.z = lerp(b.vel.z, dz, clamp(6 * dt, 0, 1));
+        Player.pos.set(b.pos.x, b.pos.y + 0.15, b.pos.z);
+        Player.vel.set(0, 0, 0);
+        Player.yaw = b.yaw;
+      } else {
+        b.vel.x = lerp(b.vel.x, 0, clamp(2 * dt, 0, 1));
+        b.vel.z = lerp(b.vel.z, 0, clamp(2 * dt, 0, 1));
+      }
+      if (b.inWater) {
+        b.vel.y = lerp(b.vel.y, 0, clamp(8 * dt, 0, 1));
+        b.pos.y = lerp(b.pos.y, Math.floor(b.pos.y) + 0.05, clamp(6 * dt, 0, 1));
+      } else {
+        b.vel.y -= CFG.gravity * 0.6 * dt;
+        if (b.vel.y < -20) b.vel.y = -20;
+      }
+      const nx = b.pos.x + b.vel.x * dt, ny = b.pos.y + b.vel.y * dt, nz = b.pos.z + b.vel.z * dt;
+      if (!World.isSolid(Math.floor(nx), Math.floor(b.pos.y), Math.floor(nz))) { b.pos.x = nx; b.pos.z = nz; }
+      else { b.vel.x = 0; b.vel.z = 0; }
+      if (World.isSolid(Math.floor(b.pos.x), Math.floor(ny), Math.floor(b.pos.z))) {
+        if (b.vel.y <= 0) { b.pos.y = Math.floor(ny) + 0.15; b.onGround = true; }
+        b.vel.y = 0;
+      } else { b.pos.y = ny; b.onGround = false; }
+      b.mesh.position.copy(b.pos);
+      b.mesh.rotation.y = b.yaw;
+      b.lightTimer -= dt;
+      if (b.lightTimer <= 0) {
+        b.lightTimer = 0.4;
+        const L = sampleWorldLight(b.pos.x, b.pos.y + 0.3, b.pos.z);
+        const a = b.mesh.geometry.attributes.aLight;
+        for (let i = 0; i < a.array.length; i += 2) { a.array[i] = L.sky; a.array[i + 1] = L.blk; }
+        a.needsUpdate = true;
+      }
+    }
+  },
+  raycast(ox, oy, oz, dx, dy, dz, maxDist) {
+    let best = null, bestT = maxDist;
+    for (const b of this.list) {
+      const hw = 0.85, hh = 0.5;
+      const x0 = b.pos.x - hw, x1 = b.pos.x + hw;
+      const y0 = b.pos.y - 0.1, y1 = b.pos.y + hh;
+      const z0 = b.pos.z - hw, z1 = b.pos.z + hw;
+      let tmin = 0, tmax = bestT, ok = true;
+      const o = [ox, oy, oz], d = [dx, dy, dz];
+      const lo = [x0, y0, z0], hi = [x1, y1, z1];
+      for (let i = 0; i < 3 && ok; i++) {
+        if (Math.abs(d[i]) < 1e-8) {
+          if (o[i] < lo[i] || o[i] > hi[i]) ok = false;
+        } else {
+          let t1 = (lo[i] - o[i]) / d[i], t2 = (hi[i] - o[i]) / d[i];
+          if (t1 > t2) { const tt = t1; t1 = t2; t2 = tt; }
+          if (t1 > tmin) tmin = t1;
+          if (t2 < tmax) tmax = t2;
+          if (tmin > tmax) ok = false;
+        }
+      }
+      if (ok && tmin < bestT) { bestT = tmin; best = b; }
+    }
+    return best ? { boat: best, dist: bestT } : null;
+  },
+  clear() { for (const b of this.list) scene.remove(b.mesh); this.list.length = 0; this.riding = null; }
 };
 
 /* ======================= 15.8 生物 ====================================== */
@@ -58783,7 +58991,7 @@ const Save = {
     } catch (e) { }
     try {
       World.reset();
-      Mobs.clear(); Drops.clear(); Arrows.clear();
+      Mobs.clear(); Drops.clear(); Arrows.clear(); Boats.clear();
       Furnaces.map.clear(); Chests.map.clear();
       if (typeof Particles !== 'undefined' && Particles.geo) { Particles.count = 0; Particles.geo.setDrawRange(0, 0); }
       Game.running = false; Game.paused = true; Game.uiOpen = false; Game.sleeping = false;
@@ -59108,6 +59316,8 @@ const Game = {
     Mobs.clear();
     Drops.clear();
     Arrows.clear();
+	Boats.clear();
+    Player.spawnPoint = null;
     if (UI.invOpen || UI.furnaceOpen) UI.closeAll();
     UI.held = null;
     Particles.count = 0;
@@ -59189,6 +59399,7 @@ const Game = {
         else Player.pos.set(sx + 0.5, World.surfaceY(sx, sz) + 1.2, sz + 0.5);
       }
       Player.vel.set(0, 0, 0);
+      Player.spawnPoint = Player.pos.clone();
       this.spawned = true;
     }
     if (this.spawned && ok >= need) this.finishLoading();
@@ -59381,6 +59592,7 @@ const Game = {
       Mobs.update(dt);
       Drops.update(dt);
       Arrows.update(dt);
+	  Boats.update(dt);
       Particles.update(dt);
       Furnaces.update(dt);
       Effects.ambient(dt);
@@ -59586,6 +59798,7 @@ const Game = {
           Mobs.update(dt);
           Drops.update(dt);
           Arrows.update(dt);
+		  Boats.update(dt);
           Particles.update(dt);
           Furnaces.update(dt);
           Effects.ambient(dt);
