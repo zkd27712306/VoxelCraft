@@ -56005,9 +56005,9 @@ const Interaction = {
     this.swing += dt * speed;
   },
   handleRight(dt, busy) {
-  if (!Input.mouse.right || !busy) { this.eatTime = 0; return; }
+    if (!Input.mouse.right || !busy) { this.eatTime = 0; return; }
     // 上船
-  if (this.boatTarget) {
+    if (this.boatTarget) {
       Boats.mount(this.boatTarget);
       this.placeCooldown = 0.3;
       this.boatTarget = null;
@@ -56132,18 +56132,29 @@ const Interaction = {
     const r = this.target;
     if (!r || this.placeCooldown > 0) return;
     const s = Inv.held();
-    if (!s || !isBlockItem(s.id)) return;
+    if (!s) return;
+
+    // 船（非方块物品）单独处理：先于 isBlockItem 检查
+    if (s.id === I.boat) {
+      const nx = r.x + r.nx, ny = r.y + r.ny, nz = r.z + r.nz;
+      if (ny < 0 || ny >= CFG.chunkY) return;
+      const cur = World.getBlock(nx, ny, nz);
+      // 船可以放在空气或液体中
+      if (cur !== 0 && !BLOCKS[cur].liquid) return;
+      Boats.spawn(nx + 0.5, ny + 0.2, nz + 0.5, Player.yaw, true);
+      this.placeCooldown = 0.3;
+      if (Player.mode !== 'creative') Inv.consumeSel(1);
+      return;
+    }
+
+    // 以下为方块物品的放置逻辑
+    if (!isBlockItem(s.id)) return;
     const id = s.id;
     const nx = r.x + r.nx, ny = r.y + r.ny, nz = r.z + r.nz;
     if (ny < 0 || ny >= CFG.chunkY) return;
     const cur = World.getBlock(nx, ny, nz);
     if (cur !== 0 && !BLOCKS[cur].liquid) return;
-	if (id === I.boat) {
-      Boats.spawn(nx + 0.5, ny + 0.3, nz + 0.5, Player.yaw, true);
-      this.placeCooldown = 0.3;
-      if (Player.mode !== 'creative') Inv.consumeSel(1);
-      return;
-    }
+
     if (id === B.bed) {
       const fx = -Math.sin(Player.yaw), fz = -Math.cos(Player.yaw);
       let dx = 0, dz = 0;
@@ -56159,6 +56170,7 @@ const Interaction = {
       if (Player.mode !== 'creative') Inv.consumeSel(1);
       return;
     }
+
     if (BLOCKS[id].solid && this.intersectsPlayer(nx, ny, nz)) return;
     if (World.setBlock(nx, ny, nz, id, true)) {
       SFX.play('place', BLOCKS[id].sound, 1.0);
