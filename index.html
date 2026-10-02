@@ -54283,12 +54283,12 @@ function buildAtlas() {
   }
 
   const tex = new THREE.CanvasTexture(cv);
-  tex.magFilter = THREE.NearestFilter;
-  tex.minFilter = THREE.NearestFilter;
-  tex.generateMipmaps = false;
+  tex.magFilter = THREE.NearestFilter;               // 放大：像素风
+  tex.minFilter = THREE.NearestMipmapNearestFilter;  // 缩小：自动选 mip，消除摩尔纹
+  tex.generateMipmaps = true;
   tex.wrapS = THREE.ClampToEdgeWrapping;
   tex.wrapT = THREE.ClampToEdgeWrapping;
-  tex.anisotropy = 1;              // 关闭各向异性，避免远处斜视混叠
+  tex.anisotropy = 4;                                // 斜视远处用各向异性
   tex.needsUpdate = true;
   return { canvas: cv, texture: tex };
 }
@@ -55354,8 +55354,7 @@ varying vec2 vLight;
 varying float vShade;
 varying float vDist;
 void main() {
-  vec2 uvq = (floor(vUv * 512.0) + 0.5) / 512.0;
-  vec4 tex = texture2D(uAtlas, uvq);
+  vec4 tex = texture2D(uAtlas, vUv);
   if (tex.a < uAlphaTest) discard;
   float sky = pow(clamp(vLight.x, 0.0, 1.0), 1.35) * uDay;
   float blk = pow(clamp(vLight.y, 0.0, 1.0), 1.5);
