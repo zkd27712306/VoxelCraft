@@ -54270,7 +54270,7 @@ def('wool', '白色羊毛', [T.sheep_wool, T.sheep_wool, T.sheep_wool], { hardne
 def('stone_bricks', '石砖', [T.stone_bricks, T.stone_bricks, T.stone_bricks], { hardness: 2.0, sound: 'stone', tool: 'pickaxe', needsTool: true });
 def('chest', '箱子', [T.chest_top, T.chest_top, T.chest_side], { hardness: 2.5, sound: 'wood', tool: 'axe', use: 'chest' });
 def('bed', '床', [T.bed_foot_top, T.planks, T.bed_side], { hardness: 0.4, sound: 'wood', use: 'bed' });
-def('bed_head', '床', [T.bed_top, T.planks, T.bed_side], { hardness: 0.4, sound: 'wood', use: 'bed', placeable: false });
+def('bed_head', '床', [T.bed_top, T.planks, T.bed_side], { hardness: 0.4, sound: 'wood', use: 'bed', placeable: false, drop: 'bed' });
 def('hay', '干草块', [T.hay_top, T.hay_top, T.hay_side], { hardness: 0.6, sound: 'grass' });
 def('coal_block', '煤炭块', [T.coal_block, T.coal_block, T.coal_block], { hardness: 5, sound: 'stone', tool: 'pickaxe', needsTool: true });
 def('iron_block', '铁块', [T.iron_block, T.iron_block, T.iron_block], { hardness: 5, sound: 'stone', tool: 'pickaxe', needsTool: true });
@@ -54564,7 +54564,7 @@ const Village = {
     if (this._cache.has(key)) return this._cache.get(key);
     const rnd = mulberry32(chunkSeed(gi, gj, (WorldGen.seed ^ 0x5a1e77) >>> 0));
     let site = null;
-    if (rnd() < 0.7) {
+    if (rnd() < 0.4) {
       const span = this.CELL * 16;
       const x = gi * span + 24 + Math.floor(rnd() * (span - 48));
       const z = gj * span + 24 + Math.floor(rnd() * (span - 48));
@@ -54591,20 +54591,28 @@ const Village = {
     return out;
   },
   /** 村庄内的建筑（相对站点中心的偏移） */
-  buildings(site) {
+    buildings(site) {
     const rnd = mulberry32((site.seed ^ 0x9e3779b9) >>> 0);
-    const n = 3 + Math.floor(rnd() * 3);
+    const n = 4 + Math.floor(rnd() * 3);
     const list = [];
     for (let i = 0; i < n; i++) {
       const a = (i / n) * 6.283 + rnd() * 0.6;
-      const r = 9 + rnd() * 7;
-      const w = 5 + Math.floor(rnd() * 3), d = 5 + Math.floor(rnd() * 3);
+      const r = 11 + rnd() * 9;
+      const w = 6 + Math.floor(rnd() * 4), d = 6 + Math.floor(rnd() * 4);
       list.push({
         cx: Math.round(site.x + Math.cos(a) * r),
         cz: Math.round(site.z + Math.sin(a) * r),
-        w: w, d: d, glass: rnd() < 0.6, chest: rnd() < 0.45, farm: rnd() < 0.4
+        w: w, d: d,
+        glass: rnd() < 0.75,
+        chest: rnd() < 0.55,
+        farm: rnd() < 0.45,
+        roof: rnd() < 0.65 ? 'gable' : 'flat',
+        lamp: rnd() < 0.7,
+        floorTile: rnd() < 0.5 ? ID.STONE_BRICKS : ID.PLANKS
       });
     }
+    // 环形道路
+    list.push({ road: true, cx: site.x, cz: site.z, r: 16 + Math.floor(rnd() * 6) });
     return list;
   },
   /** 把落在本区块内的村庄方块写入 */
@@ -54622,57 +54630,116 @@ const Village = {
       const cur = blocks[i];
       if (cur === 0 || cur === ID.WATER || cur === ID.LEAVES || cur === ID.LOG) blocks[i] = id;
     };
-    const sites = this.near(ox + 8, oz + 8, 40);
+        const sites = this.near(ox + 8, oz + 8, 48);
     for (const site of sites) {
       for (const b of this.buildings(site)) {
+        // ---- 环形道路 ----
+        if (b.road) {
+          const step = 0.045;
+          for (let a = 0; a < 6.283; a += step) {
+            const rx = Math.round(b.cx + Math.cos(a) * b.r);
+            const rz = Math.round(b.cz + Math.sin(a) * b.r);
+            if (rx + 1 < ox || rx - 1 > ox + 15 || rz + 1 < oz || rz - 1 > oz + 15) continue;
+            const ry = WorldGen.heightAt(rx, rz);
+            for (let dx = -1; dx <= 1; dx++) {
+              for (let dz = -1; dz <= 1; dz++) {
+                if (Math.abs(dx) + Math.abs(dz) > 1) continue;
+                putIfSoft(rx + dx, ry, rz + dz, ID.GRAVEL);
+                put(rx + dx, ry + 1, rz + dz, 0);
+                put(rx + dx, ry + 2, rz + dz, 0);
+              }
+            }
+          }
+          continue;
+        }
+        // ---- 房屋 ----
         const gx0 = b.cx - Math.floor(b.w / 2), gz0 = b.cz - Math.floor(b.d / 2);
-        // 与当前区块无交集则跳过
         if (gx0 + b.w + 2 < ox || gx0 - 2 > ox + 15 || gz0 + b.d + 2 < oz || gz0 - 2 > oz + 15) continue;
         const gy = WorldGen.heightAt(b.cx, b.cz);
         const rnd2 = mulberry32((site.seed ^ Math.imul(b.cx, 374761393) ^ Math.imul(b.cz, 668265263)) >>> 0);
         // 平整地基 + 清空
-        for (let x = gx0 - 1; x <= gx0 + b.w; x++) {
-          for (let z = gz0 - 1; z <= gz0 + b.d; z++) {
-            for (let y = gy + 1; y <= gy + 7; y++) put(x, y, z, 0);
-            for (let y = gy; y > gy - 4; y--) putIfSoft(x, y, z, ID.DIRT);
+        for (let x = gx0 - 2; x <= gx0 + b.w + 1; x++) {
+          for (let z = gz0 - 2; z <= gz0 + b.d + 1; z++) {
+            for (let y = gy + 1; y <= gy + 12; y++) put(x, y, z, 0);
+            for (let y = gy; y > gy - 5; y--) putIfSoft(x, y, z, ID.DIRT);
+            put(x, gy, z, b.floorTile || ID.COBBLESTONE);
           }
         }
-        // 墙
+        // 墙体（原木做角柱，木板/石砖做墙，中间开窗）
+        const wallId = rnd2() < 0.5 ? ID.PLANKS : ID.STONE_BRICKS;
         for (let x = gx0; x < gx0 + b.w; x++) {
           for (let z = gz0; z < gz0 + b.d; z++) {
             const edge = (x === gx0 || x === gx0 + b.w - 1 || z === gz0 || z === gz0 + b.d - 1);
-            if (!edge) {
-              put(x, gy + 1, z, ID.PLANKS);          // 地板
-              continue;
-            }
+            if (!edge) { put(x, gy + 1, z, b.floorTile || ID.PLANKS); continue; }
             const corner = (x === gx0 || x === gx0 + b.w - 1) && (z === gz0 || z === gz0 + b.d - 1);
             for (let y = gy + 1; y <= gy + 3; y++) {
-              let id = corner ? ID.COBBLESTONE : ID.PLANKS;
-              // 窗户
-              if (!corner && y === gy + 2 && b.glass && ((x + z) % 3 === 0)) id = ID.GLASS;
+              let id = corner ? ID.LOG : wallId;
+              if (!corner && y === gy + 2 && b.glass) {
+                const midX = (x !== gx0 && x !== gx0 + b.w - 1);
+                const midZ = (z !== gz0 && z !== gz0 + b.d - 1);
+                if ((midX && (z - gz0) % 3 === 1) || (midZ && (x - gx0) % 3 === 1)) id = ID.GLASS;
+              }
               put(x, y, z, id);
             }
           }
         }
-        // 门洞
+        // 门洞（南面）
         const doorX = gx0 + Math.floor(b.w / 2);
         put(doorX, gy + 1, gz0, 0);
         put(doorX, gy + 2, gz0, 0);
-        // 屋顶（带一圈挑檐）
-        for (let x = gx0 - 1; x <= gx0 + b.w; x++) {
-          for (let z = gz0 - 1; z <= gz0 + b.d; z++) put(x, gy + 4, z, ID.PLANKS);
+        put(doorX, gy + 3, gz0, ID.PLANKS);
+        // 屋顶：人字 / 平顶
+        if (b.roof === 'gable') {
+          const rows = Math.ceil(Math.min(b.w, b.d) / 2) + 1;
+          for (let k = 0; k < rows; k++) {
+            const x0 = gx0 - 1 + k, x1 = gx0 + b.w - k;
+            const z0 = gz0 - 1 + k, z1 = gz0 + b.d - k;
+            if (x0 > x1 || z0 > z1) break;
+            const y = gy + 4 + k;
+            for (let x = x0; x <= x1; x++) { put(x, y, z0, ID.PLANKS); put(x, y, z1, ID.PLANKS); }
+            for (let z = z0; z <= z1; z++) { put(x0, y, z, ID.PLANKS); put(x1, y, z, ID.PLANKS); }
+          }
+          const cy2 = gy + 4 + rows;
+          for (let x = gx0; x < gx0 + b.w; x++) for (let z = gz0; z < gz0 + b.d; z++) put(x, cy2, z, ID.PLANKS);
+        } else {
+          for (let x = gx0 - 1; x <= gx0 + b.w; x++)
+            for (let z = gz0 - 1; z <= gz0 + b.d; z++) put(x, gy + 4, z, ID.STONE_BRICKS);
         }
-        // 屋内：火把 + 箱子
+        // 屋内：火把 + 箱子（含战利品）+ 家具
         put(gx0 + 1, gy + 3, gz0 + 1, ID.TORCH);
-        if (b.chest) put(gx0 + b.w - 2, gy + 1, gz0 + b.d - 2, ID.CHEST);
+        put(gx0 + b.w - 2, gy + 3, gz0 + b.d - 2, ID.TORCH);
+        if (b.chest) {
+          const chx = gx0 + b.w - 2, chz = gz0 + b.d - 2;
+          put(chx, gy + 1, chz, ID.CHEST);
+          try {
+            const c = Chests.ensure(chx, gy + 1, chz);
+            Chests.fillLoot(c, rnd2);
+          } catch (e) { }
+        }
+        if (rnd2() < 0.4) put(gx0 + 1, gy + 1, gz0 + b.d - 2, ID.CRAFTING_TABLE);
+        if (rnd2() < 0.35) {
+          for (let x = gx0 + 2; x < gx0 + b.w - 2; x++)
+            for (let z = gz0 + 2; z < gz0 + b.d - 2; z++)
+              if (rnd2() < 0.3) put(x, gy + 1, z, ID.HAY);
+        }
+        // 门口路灯
+        if (b.lamp) {
+          const lx = doorX + 2, lz = gz0 - 1;
+          const ly = WorldGen.heightAt(lx, lz);
+          put(lx, ly, lz, ID.COBBLESTONE);
+          for (let y = 1; y <= 3; y++) put(lx, ly + y, lz, ID.LOG);
+          put(lx, ly + 4, lz, ID.TORCH);
+        }
         // 小农田
         if (b.farm) {
-          const fx = gx0 + b.w + 2, fz = gz0;
-          for (let x = fx; x < fx + 5; x++) {
-            for (let z = fz; z < fz + 4; z++) {
-              const water = (x === fx + 2);
-              put(x, gy, z, water ? ID.WATER : ID.DIRT);
-              put(x, gy + 1, z, water ? 0 : (rnd2() < 0.6 ? ID.HAY : 0));
+          const fx = gx0 + b.w + 3, fz = gz0;
+          for (let x = fx; x < fx + 6; x++) {
+            for (let z = fz; z < fz + 5; z++) {
+              const water = (x === fx + 2 || x === fx + 3);
+              const fy = WorldGen.heightAt(x, z);
+              put(x, fy, z, water ? ID.WATER : ID.DIRT);
+              for (let y = fy + 1; y <= fy + 2; y++) put(x, y, z, 0);
+              if (!water && rnd2() < 0.65) put(x, fy + 1, z, ID.HAY);
             }
           }
         }
@@ -56215,15 +56282,14 @@ const Interaction = {
       if (dropId) Drops.spawn(dropId, 1, x + 0.5, y + 0.45, z + 0.5, (Math.random() - 0.5) * 1.4, 1.8, (Math.random() - 0.5) * 1.4);
       if (itemDurability(heldId) > 0) Inv.damageSel(1);
     }
-    // 床：破坏任意一半都要连带另一半
+    // 床：破坏任意一半都要连带清除另一半，但整体只掉落一个床
     if (id === B.bed || id === B.bed_head) {
       const other = id === B.bed ? B.bed_head : B.bed;
       const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
       for (const d of dirs) {
         if (World.getBlock(x + d[0], y, z + d[1]) === other) {
           World.setBlock(x + d[0], y, z + d[1], 0, true);
-          if (!creative) Drops.spawn(id === B.bed ? B.bed : B.bed, 1, x + d[0] + 0.5, y + 0.5, z + d[1] + 0.5);
-          break;
+          break;   // 另一半静默移除，不额外掉落，避免一个床掉两个
         }
       }
     }
@@ -56617,6 +56683,35 @@ const Chests = {
     let c = this.map.get(k);
     if (!c) { c = { x: x, y: y, z: z, slots: new Array(27).fill(null) }; this.map.set(k, c); }
     return c;
+  },
+  /** 为自然生成的箱子填充随机战利品 */
+  fillLoot(c, rnd) {
+    if (!c || !rnd) return;
+    if (c.slots.some(s => s)) return;                // 已有内容则不覆盖
+    const pool = [
+      [I.bread, 1, 3, 9], [I.apple, 1, 3, 8], [I.wheat, 1, 4, 7],
+      [I.stick, 1, 5, 6], [I.coal, 1, 4, 6], [I.iron_ingot, 1, 2, 4],
+      [I.gold_ingot, 1, 2, 2], [I.diamond, 1, 1, 1], [B.torch, 1, 6, 7],
+      [B.planks, 2, 8, 7], [B.log, 1, 4, 5], [B.cobblestone, 2, 8, 6],
+      [B.wool, 1, 3, 4], [I.leather, 1, 3, 4], [I.feather, 1, 4, 4],
+      [I.bone, 1, 3, 3], [I.arrow, 2, 8, 4], [I.golden_apple, 1, 1, 1],
+      [I.iron_pickaxe, 1, 1, 1], [I.iron_sword, 1, 1, 1], [I.wood_axe, 1, 1, 2]
+    ];
+    const total = pool.reduce((s, p) => s + p[3], 0);
+    const rolls = 3 + Math.floor(rnd() * 4);
+    const used = new Set();
+    for (let i = 0; i < rolls; i++) {
+      let pick = rnd() * total, entry = pool[0];
+      for (const p of pool) { pick -= p[3]; if (pick <= 0) { entry = p; break; } }
+      let slot = Math.floor(rnd() * 27), guard = 0;
+      while (used.has(slot) && guard++ < 40) slot = Math.floor(rnd() * 27);
+      if (used.has(slot)) continue;
+      used.add(slot);
+      const n = entry[1] + Math.floor(rnd() * (entry[2] - entry[1] + 1));
+      const st = Inv.mk(entry[0], n);
+      if (itemDurability(entry[0]) > 0) st.dur = Math.max(1, Math.round(itemDurability(entry[0]) * (0.4 + rnd() * 0.6)));
+      c.slots[slot] = st;
+    }
   },
   remove(x, y, z) {
     const c = this.get(x, y, z);
@@ -58226,7 +58321,22 @@ function updatePlayerModel(dt) {
   pm.parts.armL.pivot.rotation.x = -swing * 0.8;
   const dig = Interaction.swingActive ? -1.2 + Math.sin(Interaction.swing * 2) * 0.5 : 0;
   pm.parts.armR.pivot.rotation.x = swing * 0.8 + dig;
-  pm.parts.head.pivot.rotation.x = clamp(Player.pitch, -0.9, 0.9);
+  // 潜行：身体前倾、头微抬、腿部略分开
+  const sneak = Player.sneaking ? 1 : 0;
+  pm.sneakBlend = lerp(pm.sneakBlend === undefined ? 0 : pm.sneakBlend, sneak, clamp(dt * 10, 0, 1));
+  const s = pm.sneakBlend;
+  if (s > 0.001) {
+    pm.group.position.y -= 0.18 * s;                             // 整体下沉
+    pm.parts.body.pivot.rotation.x = 0.42 * s;                   // 身体前倾
+    pm.parts.head.pivot.rotation.x = clamp(Player.pitch, -0.9, 0.9) - 0.42 * s;  // 头相对身体保持平视
+    pm.parts.legL.pivot.rotation.x = swing + 0.30 * s;           // 腿略后伸
+    pm.parts.legR.pivot.rotation.x = -swing + 0.30 * s;
+    pm.parts.armL.pivot.rotation.x = -swing * 0.8 + 0.20 * s;
+    pm.parts.armR.pivot.rotation.x = swing * 0.8 + dig + 0.20 * s;
+  } else {
+    pm.parts.body.pivot.rotation.x = 0;
+    pm.parts.head.pivot.rotation.x = clamp(Player.pitch, -0.9, 0.9);
+  }
   pm.lightTimer -= dt;
   if (pm.lightTimer <= 0) {
     pm.lightTimer = 0.35;
