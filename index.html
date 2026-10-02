@@ -57134,11 +57134,14 @@ const Boats = {
       parts.push(g);
     };
     const wood = T.boat_wood;
-    push(1.6, 0.15, 0.7, 0, -0.25, 0, wood);
-    push(1.6, 0.32, 0.12, 0, 0, -0.42, wood);
-    push(1.6, 0.32, 0.12, 0, 0, 0.42, wood);
-    push(0.12, 0.32, 0.8, -0.78, 0, 0, wood);
-    push(0.12, 0.32, 0.8, 0.78, 0, 0, wood);
+    // 船底：沿 Z 轴长（前进方向）
+    push(0.7, 0.15, 1.6, 0, -0.25, 0, wood);
+    // 两侧船帮
+    push(0.12, 0.32, 1.6, -0.42, 0, 0, wood);
+    push(0.12, 0.32, 1.6,  0.42, 0, 0, wood);
+    // 船头 / 船尾
+    push(0.8, 0.32, 0.12, 0, 0, -0.78, wood);
+    push(0.8, 0.32, 0.12, 0, 0,  0.78, wood);
     let total = 0;
     for (const g of parts) total += g.attributes.position.count;
     const pos = new Float32Array(total * 3);
@@ -57236,7 +57239,8 @@ const Boats = {
         const fwd = (Input.key('KeyW') ? 1 : 0) - (Input.key('KeyS') ? 1 : 0);
         const str = (Input.key('KeyD') ? 1 : 0) - (Input.key('KeyA') ? 1 : 0);
         if (str !== 0) b.yaw -= str * dt * 1.6;
-        const spd = 5.5;
+        // 水里 5.5，陆地 2.2（慢），岩浆 1.2
+        const spd = b.inWater ? 5.5 : (World.getBlock(Math.floor(b.pos.x), Math.floor(b.pos.y), Math.floor(b.pos.z)) === ID.LAVA ? 1.2 : 2.2);
         const dx = -Math.sin(b.yaw) * fwd * spd;
         const dz = -Math.cos(b.yaw) * fwd * spd;
         b.vel.x = lerp(b.vel.x, dx, clamp(6 * dt, 0, 1));
@@ -57259,26 +57263,41 @@ const Boats = {
         if (b.vel.y < -20) b.vel.y = -20;
       }
 
-      const nx = b.pos.x + b.vel.x * dt, ny = b.pos.y + b.vel.y * dt, nz = b.pos.z + b.vel.z * dt;
+            const nx = b.pos.x + b.vel.x * dt, ny = b.pos.y + b.vel.y * dt, nz = b.pos.z + b.vel.z * dt;
 
-      // 水平移动：检测船体中部高度（+0.3），而不是船底
-      const midY = Math.floor(b.pos.y + 0.3);
-      if (!World.isSolid(Math.floor(nx), midY, Math.floor(b.pos.z))) { b.pos.x = nx; }
-      else { b.vel.x = 0; }
-      if (!World.isSolid(Math.floor(b.pos.x), midY, Math.floor(nz))) { b.pos.z = nz; }
-      else { b.vel.z = 0; }
+      // 船体 AABB：宽 1.5，高 0.5，中心在 pos
+      const hw = 0.75;
+      const bodyBottom = b.pos.y - 0.15;
+      const bodyTop = b.pos.y + 0.45;
+      const solidAt = (x, y, z) => World.isSolid(Math.floor(x), Math.floor(y), Math.floor(z));
+      const boxHit = (cx, cy, cz) => {
+        const x0 = Math.floor(cx - hw + 1e-5), x1 = Math.floor(cx + hw - 1e-5);
+        const y0 = Math.floor(cy - 0.15 + 1e-5), y1 = Math.floor(cy + 0.45 - 1e-5);
+        const z0 = Math.floor(cz - hw + 1e-5), z1 = Math.floor(cz + hw - 1e-5);
+        for (let yy = y0; yy <= y1; yy++) for (let zz = z0; zz <= z1; zz++) for (let xx = x0; xx <= x1; xx++) {
+          if (World.isSolid(xx, yy, zz)) return true;
+        }
+        return false;
+      };
+
+      // 水平移动：分 X / Z 独立检测，撞到就停
+      if (!boxHit(nx, b.pos.y, b.pos.z)) b.pos.x = nx; else b.vel.x = 0;
+      if (!boxHit(b.pos.x, b.pos.y, nz)) b.pos.z = nz; else b.vel.z = 0;
 
       // 垂直移动
-        if (World.isSolid(Math.floor(b.pos.x), Math.floor(ny + 0.3), Math.floor(b.pos.z))) {
-        if (b.vel.y <= 0) { b.pos.y = Math.floor(ny) + 1.05; b.onGround = true; }
+      if (boxHit(b.pos.x, ny, b.pos.z)) {
+        if (b.vel.y <= 0) {
+          // 落在方块顶面
+          let topY = Math.floor(ny + 0.45);
+          while (topY > 0 && !solidAt(b.pos.x, topY, b.pos.z)) topY--;
+          b.pos.y = topY + 1 + 0.15;
+          b.onGround = true;
+        }
         b.vel.y = 0;
       } else { b.pos.y = ny; b.onGround = false; }
 
-      // 边界保护：船掉出世界则拉回
-      if (b.pos.y < -4) {
-        b.pos.y = CFG.seaLevel + 1.05;
-        b.vel.set(0, 0, 0);
-      }
+      // 边界保护
+      if (b.pos.y < -4) { b.pos.y = CFG.seaLevel + 1.05; b.vel.set(0, 0, 0); }
 
       b.mesh.position.copy(b.pos);
       b.mesh.rotation.y = b.yaw;
