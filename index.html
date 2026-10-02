@@ -57134,14 +57134,11 @@ const Boats = {
       parts.push(g);
     };
     const wood = T.boat_wood;
-    // 船底：沿 Z 轴长（前进方向）
-    push(0.7, 0.15, 1.6, 0, -0.25, 0, wood);
-    // 两侧船帮
-    push(0.12, 0.32, 1.6, -0.42, 0, 0, wood);
-    push(0.12, 0.32, 1.6,  0.42, 0, 0, wood);
-    // 船头 / 船尾
-    push(0.8, 0.32, 0.12, 0, 0, -0.78, wood);
-    push(0.8, 0.32, 0.12, 0, 0,  0.78, wood);
+    push(0.7, 0.15, 1.6, 0, 0.10, 0, wood);
+    push(0.12, 0.32, 1.6, -0.42, 0.35, 0, wood);
+    push(0.12, 0.32, 1.6,  0.42, 0.35, 0, wood);
+    push(0.8, 0.32, 0.12, 0, 0.35, -0.78, wood);
+    push(0.8, 0.32, 0.12, 0, 0.35,  0.78, wood);
     let total = 0;
     for (const g of parts) total += g.attributes.position.count;
     const pos = new Float32Array(total * 3);
