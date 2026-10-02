@@ -55014,7 +55014,7 @@ function meshChunk(chunk) {
             const o2 = (s2y >= 0 && s2y < CFG.chunkY) ? (BLOCKS[padBlocks[pidx(s2x, s2y, s2z)]].opaque ? 1 : 0) : 1;
             const oc = (ccy >= 0 && ccy < CFG.chunkY) ? (BLOCKS[padBlocks[pidx(ccx, ccy, ccz)]].opaque ? 1 : 0) : 1;
             const occ = (o1 && o2) ? 3 : (o1 + o2 + oc);
-            const ao = AO_TABLE[occ];
+            const ao = 1.0;
             let skySum = 0, blkSum = 0, cnt = 0;
             sampleLightAt(ax, ay, az, fbSky, fbBlk); skySum += _oSky; blkSum += _oBlk; cnt++;
             if (!o1) { sampleLightAt(s1x, s1y, s1z, fbSky, fbBlk); skySum += _oSky; blkSum += _oBlk; cnt++; }
