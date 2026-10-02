@@ -1,7 +1,7 @@
 # VoxelCraft · 单文件体素世界
 
-> 🌐 **在线玩**：https://zkd27712306.github.io/realcraft/
-> 📦 **源码**：https://github.com/zkd27712306/realcraft
+> 🌐 **在线玩**：https://zkd27712306.github.io/VoxelCraft
+> 📦 **源码**：https://github.com/zkd27712306/VoxelCraft
 
 一个用 HTML + CSS + JavaScript + Three.js 写成的 Minecraft 风格体素游戏。
 整个游戏打包在**一个 `.html` 文件**里，**Three.js 已内嵌，打开即玩**，无需安装、无需构建、无需服务器、无需联网。
@@ -58,7 +58,7 @@
 
 直接打开：
 
-    https://zkd27712306.github.io/realcraft/
+    https://zkd27712306.github.io/VoxelCraft
 
 - 无需下载，打开即玩
 - 由 GitHub Pages 托管
@@ -68,7 +68,7 @@
 
 从 GitHub 仓库下载 `voxelcraft.html`（或整个仓库）：
 
-    https://github.com/zkd27712306/realcraft
+    https://github.com/zkd27712306/VoxelCraft
 
 下载后**双击 `voxelcraft.html`**，用 Chrome / Edge / Firefox / Safari 打开即可。
 
@@ -381,8 +381,8 @@ Three.js r160 的完整源码**内嵌在 HTML 的 `<script id="three-src" type="
 
 ### 项目地址
 
-- 在线版：https://zkd27712306.github.io/realcraft/
-- 源码仓库：https://github.com/zkd27712306/realcraft
+- 在线版：https://zkd27712306.github.io/VoxelCraft
+- 源码仓库：https://github.com/zkd27712306/VoxelCraft
 
 ---
 
