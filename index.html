@@ -57010,7 +57010,7 @@ function headTiles6(tileName) {
   const h = HEAD_TILES[tileName];
   if (!h) return null;
   // 面顺序：+X, -X, +Y, -Y, +Z, -Z
-  return [h.side, h.side, h.top, h.top, h.front, h.back];
+    return [h.side, h.side, h.top, h.top, h.back, h.front];
 }
 /** 平面片几何（物品贴图） */
 function flatQuadGeometry(tile, s) {
