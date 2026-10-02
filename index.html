@@ -53439,6 +53439,7 @@ const TILE_PAD = 1;
 const TILE_CELL = TILE_PX + TILE_PAD * 2;
 const ATLAS_COLS = 16;
 const ATLAS_PX = ATLAS_COLS * TILE_CELL;
+const ATLAS_TEX = 512;
 const tileDefs = [];
 const T = {};
 function defTile(name, draw) { T[name] = tileDefs.length; tileDefs.push({ name: name, draw: draw }); }
@@ -54093,10 +54094,10 @@ itemTile('golden_apple', (c, ox, oy, rnd) => {
 
 function buildAtlas() {
   const cv = document.createElement('canvas');
-  cv.width = cv.height = ATLAS_PX;
+  cv.width = cv.height = ATLAS_TEX;
   const ctx = cv.getContext('2d');
   ctx.imageSmoothingEnabled = false;
-  ctx.clearRect(0, 0, ATLAS_PX, ATLAS_PX);
+  ctx.clearRect(0, 0, ATLAS_TEX, ATLAS_TEX);
   const tmp = document.createElement('canvas');
   tmp.width = tmp.height = TILE_PX;
   const tctx = tmp.getContext('2d');
@@ -54121,8 +54122,8 @@ function buildAtlas() {
   }
   const tex = new THREE.CanvasTexture(cv);
   tex.magFilter = THREE.NearestFilter;
-  tex.minFilter = THREE.NearestFilter;
-  tex.generateMipmaps = false;
+  tex.minFilter = THREE.NearestMipmapLinearFilter;
+  tex.generateMipmaps = true;
   tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
   tex.needsUpdate = true;
   return { canvas: cv, texture: tex };
@@ -54131,11 +54132,12 @@ function tileUV(index) {
   const col = index % ATLAS_COLS, row = (index / ATLAS_COLS) | 0;
   const x0 = col * TILE_CELL + TILE_PAD;
   const y0 = row * TILE_CELL + TILE_PAD;
+  const inset = 0.5 / ATLAS_TEX;
   return {
-    u0: x0 / ATLAS_PX,
-    u1: (x0 + TILE_PX) / ATLAS_PX,
-    v0: 1 - (y0 + TILE_PX) / ATLAS_PX,
-    v1: 1 - y0 / ATLAS_PX
+    u0: x0 / ATLAS_TEX + inset,
+    u1: (x0 + TILE_PX) / ATLAS_TEX - inset,
+    v0: 1 - (y0 + TILE_PX) / ATLAS_TEX + inset,
+    v1: 1 - y0 / ATLAS_TEX - inset
   };
 }
 
@@ -56730,7 +56732,7 @@ const Particles = {
       uniforms: {
         uAtlas: { value: atlas.texture },
         uLight: { value: 1.0 },
-        uTileSize: { value: TILE_PX / ATLAS_PX }
+        uTileSize: { value: TILE_PX / ATLAS_TEX }
       },
       vertexShader: `
         attribute float aSize; attribute vec2 aTile; attribute float aLife; attribute float aGrav;
