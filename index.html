@@ -56135,13 +56135,26 @@ const Interaction = {
     if (!s) return;
 
     // 船（非方块物品）单独处理：先于 isBlockItem 检查
-    if (s.id === I.boat) {
+      if (s.id === I.boat) {
       const nx = r.x + r.nx, ny = r.y + r.ny, nz = r.z + r.nz;
       if (ny < 0 || ny >= CFG.chunkY) return;
       const cur = World.getBlock(nx, ny, nz);
-      // 船可以放在空气或液体中
       if (cur !== 0 && !BLOCKS[cur].liquid) return;
-      Boats.spawn(nx + 0.5, ny + 0.2, nz + 0.5, Player.yaw, true);
+      // 若目标位置是水，则把船放在水面；否则贴地
+      let spawnY;
+      if (cur !== 0 && BLOCKS[cur].liquid) {
+        // 找水面的最顶一格
+        let wy = ny;
+        while (wy + 1 < CFG.chunkY) {
+          const up = World.getBlock(nx, wy + 1, nz);
+          if (up !== 0 && BLOCKS[up].liquid) wy++;
+          else break;
+        }
+        spawnY = wy + 0.05;
+      } else {
+        spawnY = ny + 0.05;
+      }
+      Boats.spawn(nx + 0.5, spawnY, nz + 0.5, Player.yaw, true);
       this.placeCooldown = 0.3;
       if (Player.mode !== 'creative') Inv.consumeSel(1);
       return;
@@ -57160,19 +57173,43 @@ const Boats = {
     this.riding = b;
     toast('已上船（Shift 下船）', 1400);
   },
-  dismount() {
+    dismount() {
     if (!this.riding) return;
     const b = this.riding;
-    Player.pos.set(b.pos.x + Math.cos(b.yaw) * 1.2, b.pos.y + 0.2, b.pos.z - Math.sin(b.yaw) * 1.2);
+    // 尝试把玩家放在船旁边安全位置，避免卡进方块
+    const offsets = [
+      [Math.cos(b.yaw) * 1.4, -Math.sin(b.yaw) * 1.4],
+      [-Math.cos(b.yaw) * 1.4, Math.sin(b.yaw) * 1.4],
+      [1.4, 0], [-1.4, 0], [0, 1.4], [0, -1.4]
+    ];
+    let placed = false;
+    for (const o of offsets) {
+      const px = b.pos.x + o[0], pz = b.pos.z + o[1];
+      const py = World.surfaceY(Math.floor(px), Math.floor(pz));
+      const tryY = Math.max(py + 1.05, b.pos.y + 0.2);
+      if (!Player.collides(px, tryY, pz)) {
+        Player.pos.set(px, tryY, pz);
+        placed = true;
+        break;
+      }
+    }
+    if (!placed) Player.pos.set(b.pos.x, b.pos.y + 1.2, b.pos.z);
     Player.vel.set(0, 0, 0);
     this.riding = null;
     toast('已下船', 1200);
   },
-  update(dt) {
+    update(dt) {
     if (this.riding && Input.key('ShiftLeft')) this.dismount();
     for (const b of this.list) {
-      const below = World.getBlock(Math.floor(b.pos.x), Math.floor(b.pos.y - 0.4), Math.floor(b.pos.z));
-      b.inWater = below !== 0 && BLOCKS[below].liquid;
+      // 更可靠的入水判断：向下探 0.6 格，或船体中心在水里
+      const bx = Math.floor(b.pos.x), by = Math.floor(b.pos.y), bz = Math.floor(b.pos.z);
+      const bBelow = World.getBlock(bx, by - 1, bz);
+      const bAt = World.getBlock(bx, by, bz);
+      const bAbove = World.getBlock(bx, by + 1, bz);
+      b.inWater = (bBelow !== 0 && BLOCKS[bBelow].liquid)
+        || (bAt !== 0 && BLOCKS[bAt].liquid)
+        || (bAbove !== 0 && BLOCKS[bAbove].liquid);
+
       if (this.riding === b) {
         const fwd = (Input.key('KeyW') ? 1 : 0) - (Input.key('KeyS') ? 1 : 0);
         const str = (Input.key('KeyD') ? 1 : 0) - (Input.key('KeyA') ? 1 : 0);
@@ -57189,22 +57226,41 @@ const Boats = {
         b.vel.x = lerp(b.vel.x, 0, clamp(2 * dt, 0, 1));
         b.vel.z = lerp(b.vel.z, 0, clamp(2 * dt, 0, 1));
       }
+
       if (b.inWater) {
+        // 浮力：向上推，并让船体底部贴水面
+        const targetY = Math.floor(b.pos.y) + 0.05;
         b.vel.y = lerp(b.vel.y, 0, clamp(8 * dt, 0, 1));
-        b.pos.y = lerp(b.pos.y, Math.floor(b.pos.y) + 0.05, clamp(6 * dt, 0, 1));
+        b.pos.y = lerp(b.pos.y, targetY, clamp(6 * dt, 0, 1));
       } else {
         b.vel.y -= CFG.gravity * 0.6 * dt;
         if (b.vel.y < -20) b.vel.y = -20;
       }
+
       const nx = b.pos.x + b.vel.x * dt, ny = b.pos.y + b.vel.y * dt, nz = b.pos.z + b.vel.z * dt;
-      if (!World.isSolid(Math.floor(nx), Math.floor(b.pos.y), Math.floor(nz))) { b.pos.x = nx; b.pos.z = nz; }
-      else { b.vel.x = 0; b.vel.z = 0; }
-      if (World.isSolid(Math.floor(b.pos.x), Math.floor(ny), Math.floor(b.pos.z))) {
-        if (b.vel.y <= 0) { b.pos.y = Math.floor(ny) + 0.15; b.onGround = true; }
+
+      // 水平移动：检测船体中部高度（+0.3），而不是船底
+      const midY = Math.floor(b.pos.y + 0.3);
+      if (!World.isSolid(Math.floor(nx), midY, Math.floor(b.pos.z))) { b.pos.x = nx; }
+      else { b.vel.x = 0; }
+      if (!World.isSolid(Math.floor(b.pos.x), midY, Math.floor(nz))) { b.pos.z = nz; }
+      else { b.vel.z = 0; }
+
+      // 垂直移动
+      if (World.isSolid(Math.floor(b.pos.x), Math.floor(ny + 0.3), Math.floor(b.pos.z))) {
+        if (b.vel.y <= 0) { b.pos.y = Math.floor(ny) + 0.05; b.onGround = true; }
         b.vel.y = 0;
       } else { b.pos.y = ny; b.onGround = false; }
+
+      // 边界保护：船掉出世界则拉回
+      if (b.pos.y < -4) {
+        b.pos.y = CFG.seaLevel + 1.05;
+        b.vel.set(0, 0, 0);
+      }
+
       b.mesh.position.copy(b.pos);
       b.mesh.rotation.y = b.yaw;
+
       b.lightTimer -= dt;
       if (b.lightTimer <= 0) {
         b.lightTimer = 0.4;
