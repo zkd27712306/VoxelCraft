@@ -57269,8 +57269,8 @@ const Boats = {
       else { b.vel.z = 0; }
 
       // 垂直移动
-      if (World.isSolid(Math.floor(b.pos.x), Math.floor(ny + 0.3), Math.floor(b.pos.z))) {
-        if (b.vel.y <= 0) { b.pos.y = Math.floor(ny) + 0.05; b.onGround = true; }
+        if (World.isSolid(Math.floor(b.pos.x), Math.floor(ny + 0.3), Math.floor(b.pos.z))) {
+        if (b.vel.y <= 0) { b.pos.y = Math.floor(ny) + 1.05; b.onGround = true; }
         b.vel.y = 0;
       } else { b.pos.y = ny; b.onGround = false; }
 
