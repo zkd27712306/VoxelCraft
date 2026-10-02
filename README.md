@@ -66,11 +66,11 @@
 
 ### 方式二：下载到本地运行
 
-从 GitHub 仓库下载 `voxelcraft.html`（或整个仓库）：
+从 GitHub 仓库下载 `index.html`（或整个仓库）：
 
     https://github.com/zkd27712306/VoxelCraft
 
-下载后**双击 `voxelcraft.html`**，用 Chrome / Edge / Firefox / Safari 打开即可。
+下载后**双击 `index.html`**，用 Chrome / Edge / Firefox / Safari 打开即可。
 
 - 无需联网
 - 无需服务器
