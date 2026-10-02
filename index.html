@@ -55005,7 +55005,10 @@ function meshChunk(chunk) {
           for (let k = 0; k < 4; k++) {
             const cv = F.verts[k];
             const tu = F.uv[k];
-            const px = x + cv[0], py = y + cv[1], pz = z + cv[2];
+            const EPS = 0.0012;
+            const px = x + cv[0] + F.n[0] * EPS;
+            const py = y + cv[1] + F.n[1] * EPS;
+            const pz = z + cv[2] + F.n[2] * EPS;
             const su = PUV[k][0], sv = PUV[k][1];
             const s1x = ax + u[0] * su, s1y = ay + u[1] * su, s1z = az + u[2] * su;
             const s2x = ax + v[0] * sv, s2y = ay + v[1] * sv, s2z = az + v[2] * sv;
