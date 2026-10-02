@@ -54929,7 +54929,7 @@ function faceVisible(self, nb) {
 }
 function buildPad(chunk) {
   const padY = Math.min(CFG.chunkY, chunk.maxY + 3);
-  padBlocks.fill(0, 0, PAD * PAD * padY);
+  padBlocks.fill(0);
   for (let dz = -1; dz <= 1; dz++) {
     for (let dx = -1; dx <= 1; dx++) {
       const ch = World.getChunk(chunk.cx + dx, chunk.cz + dz);
@@ -54937,7 +54937,7 @@ function buildPad(chunk) {
       const sx0 = dx < 0 ? 15 : 0, sx1 = dx > 0 ? 1 : 16;
       const sz0 = dz < 0 ? 15 : 0, sz1 = dz > 0 ? 1 : 16;
       const src = ch.blocks;
-      const yEnd = Math.min(padY, ch.maxY + 2);
+      const yEnd = padY;
       for (let y = 0; y < yEnd; y++) {
         const pBaseY = y * PAD * PAD;
         for (let sz = sz0; sz < sz1; sz++) {
