@@ -53568,16 +53568,14 @@ defTile('leaves', (c, ox, oy, rnd) => {
   speckle(c, ox, oy, rnd, rgb8(38, 82, 30), 40);
 });
 defTile('sand', (c, ox, oy, rnd) => {
-  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
-    const w = Math.sin(x * 0.35 + y * 0.22) * 0.5 + 0.5;
-    const v = 205 + w * 22;
-    pset(c, ox, oy, x, y, rgb8(v, v * 0.945, v * 0.735));
-  }
+  noiseFill(c, ox, oy, rnd, [221, 209, 163], 12);
+  speckle(c, ox, oy, rnd, rgb8(202, 189, 142), 30);
+  speckle(c, ox, oy, rnd, rgb8(236, 226, 186), 24);
 });
 defTile('water', (c, ox, oy, rnd) => {
   for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
-    const w = Math.sin(x * 0.35 + y * 0.45) * 0.5 + 0.5;
-    const v = 175 + w * 30;
+    const w = Math.sin(x * 0.9 + y * 1.7) * 0.5 + 0.5;
+    const v = 150 + w * 60 + (rnd() * 2 - 1) * 12;
     pset(c, ox, oy, x, y, rgb8(v * 0.22, v * 0.52, v * 0.98));
   }
 });
