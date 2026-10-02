@@ -54290,11 +54290,13 @@ function tileUV(index) {
   const col = index % ATLAS_COLS, row = (index / ATLAS_COLS) | 0;
   const x0 = col * TILE_CELL + TILE_PAD;
   const y0 = row * TILE_CELL + TILE_PAD;
+  // 关键：UV 内缩半个像素，避免远处采样跨 tile 边界产生斜线/接缝
+  const inset = 0.5 / ATLAS_PX;
   return {
-    u0: x0 / ATLAS_PX,
-    u1: (x0 + TILE_PX) / ATLAS_PX,
-    v0: 1 - (y0 + TILE_PX) / ATLAS_PX,
-    v1: 1 - y0 / ATLAS_PX
+    u0: x0 / ATLAS_PX + inset,
+    u1: (x0 + TILE_PX) / ATLAS_PX - inset,
+    v0: 1 - (y0 + TILE_PX) / ATLAS_PX + inset,
+    v1: 1 - y0 / ATLAS_PX - inset
   };
 }
 
@@ -55282,7 +55284,7 @@ renderer.autoClear = true;
 renderer.sortObjects = true;
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.05, 1200);
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 
 const atlas = buildAtlas();
 
@@ -57067,7 +57069,8 @@ const Particles = {
   uniforms: {
     uAtlas: { value: atlas.texture },
     uLight: { value: 1.0 },
-    uTileSize: { value: TILE_PX / ATLAS_PX }
+    // 与 tileUV 的内缩保持一致，避免粒子边缘渗色
+    uTileSize: { value: (TILE_PX - 1) / ATLAS_PX }
   },
   vertexShader: `
     attribute float aSize; attribute vec2 aTile; attribute float aLife; attribute float aGrav;
@@ -57530,7 +57533,7 @@ class Mob {
     this.home = new THREE.Vector3(x, y, z);
     this.build();
   }
-  build() {
+    build() {
     const t = this.type;
     this.group = new THREE.Group();
     this.mat = voxelMaterial({
@@ -57541,7 +57544,11 @@ class Mob {
     for (const pd of t.parts) {
       const tile = T[pd.t];
       const sx = pd.s[0] / 16, sy = pd.s[1] / 16, sz = pd.s[2] / 16;
-      const geo = blockBoxGeometry({ tiles: [tile, tile, tile] }, 1);
+      // 头部使用六面贴图
+      const h6 = (pd.a === 'head') ? headTiles6(pd.t) : null;
+      const geo = h6
+        ? blockBoxGeometry({ tiles: [tile, tile, tile] }, 1, h6)
+        : blockBoxGeometry({ tiles: [tile, tile, tile] }, 1);
       geo.scale(sx, sy, sz);
       addVoxelAttrs(geo, 1, 0, 1);
       const mesh = new THREE.Mesh(geo, this.mat);
@@ -59550,8 +59557,12 @@ const Game = {
     WorldGen.init(seed);
     World.seed = seed;
     this.chunkList = []; this.listCX = 1e9; this.listCZ = 1e9; this.forceChunkRefresh = true;
-	const touchOn = Settings.touchPref === 'on' ? true
-    : (Settings.touchPref === 'off' ? false : Touch.detectMobile());
+    if (Touch.el) { try { Touch.el.remove(); } catch (e) { } Touch.el = null; }
+    Touch.enabled = false;
+    Touch.joyId = null;
+    Touch.lookId = null;
+    const touchOn = Settings.touchPref === 'on' ? true
+      : (Settings.touchPref === 'off' ? false : Touch.detectMobile());
     Touch.setEnabled(touchOn);
     Input.touchMode = touchOn;
     Sky.time = saveData && typeof saveData.time === 'number' ? saveData.time : 0.30;
