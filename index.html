@@ -56218,7 +56218,15 @@ const Interaction = {
       if (BLOCKS[id].use === 'furnace') Furnaces.ensure(nx, ny, nz);
       if (BLOCKS[id].use === 'chest') Chests.ensure(nx, ny, nz);
     }
-  },,
+  },
+  intersectsPlayer(x, y, z) {
+    const hw = CFG.playerW / 2;
+    const minX = Player.pos.x - hw, maxX = Player.pos.x + hw;
+    const minY = Player.pos.y, maxY = Player.pos.y + CFG.playerH;
+    const minZ = Player.pos.z - hw, maxZ = Player.pos.z + hw;
+    return (x + 1 > minX && x < maxX && y + 1 > minY && y < maxY && z + 1 > minZ && z < maxZ);
+  }
+};
 
 /* ======================= 15.5 物品 / 背包 / 合成 ========================= */
 const ITEM_BASE = 256;
