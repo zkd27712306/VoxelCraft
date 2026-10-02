@@ -53568,14 +53568,16 @@ defTile('leaves', (c, ox, oy, rnd) => {
   speckle(c, ox, oy, rnd, rgb8(38, 82, 30), 40);
 });
 defTile('sand', (c, ox, oy, rnd) => {
-  noiseFill(c, ox, oy, rnd, [221, 209, 163], 12);
-  speckle(c, ox, oy, rnd, rgb8(202, 189, 142), 30);
-  speckle(c, ox, oy, rnd, rgb8(236, 226, 186), 24);
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+    const w = Math.sin(x * 0.35 + y * 0.22) * 0.5 + 0.5;
+    const v = 205 + w * 22;
+    pset(c, ox, oy, x, y, rgb8(v, v * 0.945, v * 0.735));
+  }
 });
 defTile('water', (c, ox, oy, rnd) => {
   for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
-    const w = Math.sin(x * 0.9 + y * 1.7) * 0.5 + 0.5;
-    const v = 150 + w * 60 + (rnd() * 2 - 1) * 12;
+    const w = Math.sin(x * 0.35 + y * 0.45) * 0.5 + 0.5;
+    const v = 175 + w * 30;
     pset(c, ox, oy, x, y, rgb8(v * 0.22, v * 0.52, v * 0.98));
   }
 });
@@ -56128,39 +56130,61 @@ const Interaction = {
     this.swingActive = false;
     this.eatTime = 0;
   },
-  place() {
-    const r = this.target;
-    if (!r || this.placeCooldown > 0) return;
+    place() {
+    if (this.placeCooldown > 0) return;
     const s = Inv.held();
     if (!s) return;
 
-    // 船（非方块物品）单独处理：先于 isBlockItem 检查
-      if (s.id === I.boat) {
-      const nx = r.x + r.nx, ny = r.y + r.ny, nz = r.z + r.nz;
-      if (ny < 0 || ny >= CFG.chunkY) return;
-      const cur = World.getBlock(nx, ny, nz);
-      if (cur !== 0 && !BLOCKS[cur].liquid) return;
-      // 若目标位置是水，则把船放在水面；否则贴地
+    // 船：不依赖方块射线，直接沿视线找落点
+    if (s.id === I.boat) {
+      Player.eyePos(_rayOrigin);
+      Player.lookDir(_rayDir);
+      let px, py, pz;
+      if (this.target) {
+        // 有方块：放在其相邻格
+        px = this.target.x + this.target.nx;
+        py = this.target.y + this.target.ny;
+        pz = this.target.z + this.target.nz;
+      } else {
+        // 无方块：沿视线落在 3 格处
+        const dist = 3.0;
+        px = Math.floor(_rayOrigin.x + _rayDir.x * dist);
+        py = Math.floor(_rayOrigin.y + _rayDir.y * dist);
+        pz = Math.floor(_rayOrigin.z + _rayDir.z * dist);
+      }
+      // 从该点向下找第一个非空气方块，把船放在其上方
+      let ground = -1;
+      for (let y = py; y >= 0; y--) {
+        const b = World.getBlock(px, y, pz);
+        if (b !== 0 && !BLOCKS[b].liquid) { ground = y; break; }
+      }
       let spawnY;
-      if (cur !== 0 && BLOCKS[cur].liquid) {
-        // 找水面的最顶一格
-        let wy = ny;
+      if (ground < 0) {
+        spawnY = CFG.seaLevel + 1;
+      } else {
+        // 从地面往上找水面最顶格
+        let wy = ground + 1;
         while (wy + 1 < CFG.chunkY) {
-          const up = World.getBlock(nx, wy + 1, nz);
+          const up = World.getBlock(px, wy + 1, pz);
           if (up !== 0 && BLOCKS[up].liquid) wy++;
           else break;
         }
-        spawnY = wy + 0.05;
-      } else {
-        spawnY = ny + 0.05;
+        const atW = World.getBlock(px, wy, pz);
+        if (atW !== 0 && BLOCKS[atW].liquid) {
+          spawnY = wy + 1.05;   // 水面上
+        } else {
+          spawnY = wy + 0.05;   // 地面上
+        }
       }
-      Boats.spawn(nx + 0.5, spawnY, nz + 0.5, Player.yaw, true);
+      Boats.spawn(px + 0.5, spawnY, pz + 0.5, Player.yaw, true);
       this.placeCooldown = 0.3;
       if (Player.mode !== 'creative') Inv.consumeSel(1);
       return;
     }
 
-    // 以下为方块物品的放置逻辑
+    // 以下为方块物品，仍依赖射线命中
+    const r = this.target;
+    if (!r) return;
     if (!isBlockItem(s.id)) return;
     const id = s.id;
     const nx = r.x + r.nx, ny = r.y + r.ny, nz = r.z + r.nz;
@@ -56195,14 +56219,6 @@ const Interaction = {
       if (BLOCKS[id].use === 'chest') Chests.ensure(nx, ny, nz);
     }
   },
-  intersectsPlayer(x, y, z) {
-    const hw = CFG.playerW / 2;
-    const minX = Player.pos.x - hw, maxX = Player.pos.x + hw;
-    const minY = Player.pos.y, maxY = Player.pos.y + CFG.playerH;
-    const minZ = Player.pos.z - hw, maxZ = Player.pos.z + hw;
-    return (x + 1 > minX && x < maxX && y + 1 > minY && y < maxY && z + 1 > minZ && z < maxZ);
-  }
-};
 
 /* ======================= 15.5 物品 / 背包 / 合成 ========================= */
 const ITEM_BASE = 256;
