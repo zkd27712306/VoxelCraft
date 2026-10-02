@@ -53571,10 +53571,11 @@ const CFG = {
 
 /* ======================= 3. 程序化纹理（16×16 图集） ===================== */
 const TILE_PX = 16;
-const TILE_PAD = 8;                              // padding 加大，避免远处采样跨 tile
-const TILE_CELL = TILE_PX + TILE_PAD * 2;        // 32
+const TILE_PAD = 1;
+const TILE_CELL = TILE_PX + TILE_PAD * 2;
 const ATLAS_COLS = 16;
-const ATLAS_PX = ATLAS_COLS * TILE_CELL;         // 512，是 2 的幂
+const ATLAS_CONTENT = ATLAS_COLS * TILE_CELL;
+const ATLAS_PX = 512;
 const tileDefs = [];
 const T = {}; // 纹理名 -> 图集序号
 function defTile(name, draw) { T[name] = tileDefs.length; tileDefs.push({ name: name, draw: draw }); }
@@ -54285,7 +54286,9 @@ function buildAtlas() {
   tex.magFilter = THREE.NearestFilter;
   tex.minFilter = THREE.NearestFilter;
   tex.generateMipmaps = false;
-  tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.wrapS = THREE.ClampToEdgeWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.anisotropy = 1;              // 关闭各向异性，避免远处斜视混叠
   tex.needsUpdate = true;
   return { canvas: cv, texture: tex };
 }
@@ -54294,7 +54297,7 @@ function tileUV(index) {
   const col = index % ATLAS_COLS, row = (index / ATLAS_COLS) | 0;
   const x0 = col * TILE_CELL + TILE_PAD;
   const y0 = row * TILE_CELL + TILE_PAD;
-  // 关键：UV 内缩半个像素，避免远处采样跨 tile 边界产生斜线/接缝
+  // 内缩半个纹素，防止远处采样跨越 tile 边界
   const inset = 0.5 / ATLAS_PX;
   return {
     u0: x0 / ATLAS_PX + inset,
@@ -55351,7 +55354,8 @@ varying vec2 vLight;
 varying float vShade;
 varying float vDist;
 void main() {
-  vec4 tex = texture2D(uAtlas, vUv);
+  vec2 uvq = (floor(vUv * 512.0) + 0.5) / 512.0;
+  vec4 tex = texture2D(uAtlas, uvq);
   if (tex.a < uAlphaTest) discard;
   float sky = pow(clamp(vLight.x, 0.0, 1.0), 1.35) * uDay;
   float blk = pow(clamp(vLight.y, 0.0, 1.0), 1.5);
