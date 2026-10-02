@@ -53571,10 +53571,10 @@ const CFG = {
 
 /* ======================= 3. 程序化纹理（16×16 图集） ===================== */
 const TILE_PX = 16;
-const TILE_PAD = 1;
-const TILE_CELL = TILE_PX + TILE_PAD * 2;
+const TILE_PAD = 8;                              // padding 加大，避免远处采样跨 tile
+const TILE_CELL = TILE_PX + TILE_PAD * 2;        // 32
 const ATLAS_COLS = 16;
-const ATLAS_PX = ATLAS_COLS * TILE_CELL;
+const ATLAS_PX = ATLAS_COLS * TILE_CELL;         // 512，是 2 的幂
 const tileDefs = [];
 const T = {}; // 纹理名 -> 图集序号
 function defTile(name, draw) { T[name] = tileDefs.length; tileDefs.push({ name: name, draw: draw }); }
@@ -54176,6 +54176,10 @@ defTile('villager_head_top', (c, ox, oy, rnd) => {
   noiseFill(c, ox, oy, rnd, [76, 50, 30], 7);
   speckle(c, ox, oy, rnd, rgb8(58, 36, 22), 20);
 });
+defTile('villager_nose', (c, ox, oy, rnd) => {
+  noiseFill(c, ox, oy, rnd, [186, 136, 100], 6);
+  speckle(c, ox, oy, rnd, rgb8(168, 120, 86), 14);
+});
 defTile('zombie_head_side', (c, ox, oy, rnd) => {
   noiseFill(c, ox, oy, rnd, [86, 132, 66], 9);
   speckle(c, ox, oy, rnd, rgb8(68, 110, 52), 18);
@@ -54263,8 +54267,8 @@ function buildAtlas() {
     try { tileDefs[i].draw(tctx, 0, 0, rnd); }
     catch (e) { tctx.fillStyle = '#ff00ff'; tctx.fillRect(0, 0, TILE_PX, TILE_PX); }
 
-    // 2) 贴到图集
-    ctx.drawImage(tmp, dx, dy);
+    // 2) 贴到图集（放大到 TILE_PX 目标尺寸）
+    ctx.drawImage(tmp, 0, 0, TILE_PX, TILE_PX, dx, dy, TILE_PX, TILE_PX);
 
     // 3) 边缘克隆到 padding
     ctx.drawImage(tmp, 0, 0, 1, TILE_PX, dx - 1, dy, 1, TILE_PX);
@@ -55483,6 +55487,16 @@ const chunkGroup = new THREE.Group();
 scene.add(chunkGroup);
 
 const ChunkRenderer = {
+setChunkOffset(chunk, ox, oz) {
+    const wx = chunk.cx * 16 - ox, wz = chunk.cz * 16 - oz;
+    for (let i = 0; i < 4; i++) {
+      const m = chunk.meshes[i];
+      if (m) m.position.set(wx, 0, wz);
+    }
+  },
+  refreshAllOffsets(ox, oz) {
+    for (const c of World.chunks.values()) this.setChunkOffset(c, ox, oz);
+  },
   build(chunk) {
     let geo = null;
     try { geo = meshChunk(chunk); }
@@ -55501,7 +55515,7 @@ const ChunkRenderer = {
       const g = geo[keys[i]];
       if (!g) continue;
       const m = new THREE.Mesh(g, mats[i]);
-      m.position.set(chunk.cx * 16, 0, chunk.cz * 16);
+      m.position.set(chunk.cx * 16 - Game.renderOriginX, 0, chunk.cz * 16 - Game.renderOriginZ);
       m.renderOrder = i;
       chunkGroup.add(m);
       chunk.meshes[i] = m;
@@ -56201,7 +56215,7 @@ const Interaction = {
 
     if (r.hit && !useMob) {
       highlight.visible = true;
-      highlight.position.set(r.x + 0.5, r.y + 0.5, r.z + 0.5);
+      highlight.position.set(r.x + 0.5 - Game.renderOriginX, r.y + 0.5, r.z + 0.5 - Game.renderOriginZ);
     } else {
       highlight.visible = false;
     }
@@ -56245,7 +56259,7 @@ const Interaction = {
           this.breakBlock(r.x, r.y, r.z, r.block, heldId);
         } else {
           setCrackStage(Math.min(9, Math.floor(this.breakProgress * 10)));
-          crackMesh.position.set(r.x + 0.5, r.y + 0.5, r.z + 0.5);
+          crackMesh.position.set(r.x + 0.5 - Game.renderOriginX, r.y + 0.5, r.z + 0.5 - Game.renderOriginZ);
           // 挖掘碎屑
           if (Math.random() < dt * 12) {
             Particles.spawnAt(r.x + 0.5 + (Math.random() - 0.5) * 0.8, r.y + 0.5 + (Math.random() - 0.5) * 0.8, r.z + 0.5 + (Math.random() - 0.5) * 0.8,
@@ -57009,8 +57023,9 @@ const HEAD_TILES = {
 function headTiles6(tileName) {
   const h = HEAD_TILES[tileName];
   if (!h) return null;
-  // 面顺序：+X, -X, +Y, -Y, +Z, -Z
-    return [h.side, h.side, h.top, h.top, h.back, h.front];
+  // BoxGeometry 面顺序：+X, -X, +Y, -Y, +Z, -Z
+  // 生物模型 -Z 为前方，所以 -Z(索引5)=front，+Z(索引4)=back
+  return [h.side, h.side, h.top, h.top, h.back, h.front];
 }
 /** 平面片几何（物品贴图） */
 function flatQuadGeometry(tile, s) {
@@ -57206,7 +57221,7 @@ const Drops = {
     const mesh = new THREE.Mesh(geo, this.mat);
     const L = sampleWorldLight(x, y, z);
     setMeshLight(mesh, L.sky, L.blk);
-    mesh.position.set(x, y, z);
+    mesh.position.set(x - Game.renderOriginX, y, z - Game.renderOriginZ);
     mesh.rotation.y = Math.random() * Math.PI * 2;
     scene.add(mesh);
     const e = {
@@ -57287,7 +57302,7 @@ const Drops = {
       }
       // 动画
       e.spin += dt * 1.6;
-      e.mesh.position.set(e.pos.x, e.pos.y + Math.sin(e.age * 2.6) * 0.05, e.pos.z);
+      e.mesh.position.set(e.pos.x - Game.renderOriginX, e.pos.y + Math.sin(e.age * 2.6) * 0.05, e.pos.z - Game.renderOriginZ);
       e.mesh.rotation.y = e.spin;
       e.lightTimer -= dt;
       if (e.lightTimer <= 0) {
@@ -57320,7 +57335,7 @@ const Arrows = {
       this.mat = voxelMaterial({ side: THREE.DoubleSide, uniforms: { uAlphaTest: { value: 0.5 } } });
     }
     const mesh = new THREE.Mesh(this.geo, this.mat);
-    mesh.position.set(x, y, z);
+    mesh.position.set(x - Game.renderOriginX, y, z - Game.renderOriginZ);
     scene.add(mesh);
     this.list.push({
       pos: new THREE.Vector3(x, y, z),
@@ -57369,9 +57384,9 @@ const Arrows = {
         list.splice(i, 1);
         continue;
       }
-      a.mesh.position.copy(a.pos);
+      a.mesh.position.set(a.pos.x - Game.renderOriginX, a.pos.y, a.pos.z - Game.renderOriginZ);
       const d = a.vel.clone().normalize();
-      a.mesh.lookAt(a.pos.x + d.x, a.pos.y + d.y, a.pos.z + d.z);
+      a.mesh.lookAt(a.pos.x + d.x - Game.renderOriginX, a.pos.y + d.y, a.pos.z + d.z - Game.renderOriginZ);
     }
   },
   clear() { for (const a of this.list) scene.remove(a.mesh); this.list.length = 0; }
@@ -57477,7 +57492,7 @@ const MOB_TYPES = {
     drops: [], parts: [
       { a: 'none', s: [8, 12, 4], p: [0, 12, 0], t: 'villager_body' },
       { a: 'head', s: [8, 8, 8], p: [0, 22, 0], t: 'villager_head' },
-      { a: 'none', s: [2, 3, 2], p: [0, 21, -5], t: 'villager_head' },
+      { a: 'none', s: [2, 3, 2], p: [0, 21, -5], t: 'villager_nose' },
       { a: 'arm', s: [4, 12, 4], p: [-6, 16, 0], t: 'villager_arm', ph: 0, crossed: -1 },
       { a: 'arm', s: [4, 12, 4], p: [6, 16, 0], t: 'villager_arm', ph: 0, crossed: 1 },
       { a: 'leg', s: [4, 12, 4], p: [-2, 6, 0], t: 'villager_leg', ph: 0 },
@@ -57544,7 +57559,6 @@ class Mob {
     for (const pd of t.parts) {
       const tile = T[pd.t];
       const sx = pd.s[0] / 16, sy = pd.s[1] / 16, sz = pd.s[2] / 16;
-      // 头部使用六面贴图
       const h6 = (pd.a === 'head') ? headTiles6(pd.t) : null;
       const geo = h6
         ? blockBoxGeometry({ tiles: [tile, tile, tile] }, 1, h6)
@@ -57563,7 +57577,7 @@ class Mob {
       this.group.add(pivot);
       this.parts.push({ pivot: pivot, def: pd });
     }
-    this.group.position.copy(this.pos);
+    this.group.position.set(this.pos.x - Game.renderOriginX, this.pos.y, this.pos.z - Game.renderOriginZ);
     scene.add(this.group);
     this.updateLight(true);
   }
@@ -57760,7 +57774,7 @@ class Mob {
     }
 
     // 同步渲染
-    this.group.position.copy(this.pos);
+    this.group.position.set(this.pos.x - Game.renderOriginX, this.pos.y, this.pos.z - Game.renderOriginZ);
     this.group.rotation.y = this.yaw;
     this.lightTimer -= dt;
     if (this.lightTimer <= 0) { this.lightTimer = 0.35; this.updateLight(); }
@@ -58436,7 +58450,7 @@ function buildPlayerModel() {
 function updatePlayerModel(dt) {
   const pm = playerModel;
   if (!pm || !pm.group.visible) return;
-  pm.group.position.copy(Player.pos);
+  pm.group.position.set(Player.pos.x - Game.renderOriginX, Player.pos.y, Player.pos.z - Game.renderOriginZ);
   pm.group.rotation.y = Player.yaw;
   const swing = Math.sin(Player.bobPhase) * 0.85 * Math.min(1, Player.bobAmp);
   pm.parts.legL.pivot.rotation.x = swing;
@@ -59290,6 +59304,7 @@ const Game = {
   forceChunkRefresh: false,
   pendingSave: null,
   lastTime: 0, autosaveTimer: 0, needPointerHint: false,
+  renderOriginX: 0, renderOriginZ: 0, _offsetInit: false,
 
   init() {
     Input.init();
@@ -59938,6 +59953,23 @@ const Game = {
         if (this.viewMode === 1) camera.rotation.set(Player.pitch, Player.yaw, roll, 'YXZ');
         else camera.rotation.set(-Player.pitch, Player.yaw + Math.PI, -roll, 'YXZ');
       }
+	// ===== 相机相对渲染：解决远处波浪线 =====
+      const ox = Math.floor(camera.position.x / 16) * 16;
+      const oz = Math.floor(camera.position.z / 16) * 16;
+      if (!this._offsetInit || ox !== this.renderOriginX || oz !== this.renderOriginZ) {
+        this.renderOriginX = ox;
+        this.renderOriginZ = oz;
+        this._offsetInit = true;
+        ChunkRenderer.refreshAllOffsets(ox, oz);
+        for (const e of Drops.list) e.mesh.position.set(e.pos.x - ox, e.mesh.position.y, e.pos.z - oz);
+        for (const a of Arrows.list) a.mesh.position.set(a.pos.x - ox, a.pos.y, a.pos.z - oz);
+        for (const m of Mobs.list) m.group.position.set(m.pos.x - ox, m.pos.y, m.pos.z - oz);
+        if (playerModel) playerModel.group.position.set(Player.pos.x - ox, Player.pos.y, Player.pos.z - oz);
+        if (Particles.points) Particles.points.position.set(-ox, 0, -oz);
+      }
+      // 相机每帧都被重写过，这里必须再减一次 origin
+      camera.position.x -= this.renderOriginX;
+      camera.position.z -= this.renderOriginZ;
       if (Player.shake > 0.001) {
         camera.position.x += (Math.random() - 0.5) * Player.shake;
         camera.position.y += (Math.random() - 0.5) * Player.shake;
