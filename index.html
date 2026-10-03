@@ -1832,7 +1832,11 @@ function spreadLight(arr, blocks, yLimit) {
 /* ======================= 9. 网格生成 ===================================== */
 const PAD = 18;
 const padBlocks = new Uint8Array(PAD * PAD * CFG.chunkY);
-function pidx(x, y, z) { return (x + 1) + (z + 1) * PAD + y * PAD * PAD; }
+function pidx(x, y, z) {
+  // 修复：钳制 y，避免越界读到 undefined 导致方块变黑
+  if (y < 0) y = 0; else if (y >= CFG.chunkY) y = CFG.chunkY - 1;
+  return (x + 1) + (z + 1) * PAD + y * PAD * PAD;
+}
 const FACES = [
   { n: [0, 1, 0], u: [0, 0, 1], v: [1, 0, 0], verts: [[0, 1, 0], [0, 1, 1], [1, 1, 1], [1, 1, 0]], uv: [[0, 0], [0, 1], [1, 1], [1, 0]] },
   { n: [0, -1, 0], u: [1, 0, 0], v: [0, 0, 1], verts: [[0, 0, 0], [1, 0, 0], [1, 0, 1], [0, 0, 1]], uv: [[0, 0], [1, 0], [1, 1], [0, 1]] },
@@ -2717,12 +2721,17 @@ const Player = {
     // 死亡后回到出生点
     const sp = this.spawnPoint || new THREE.Vector3(8.5, 100, 8.5);
     const sx = Math.floor(sp.x), sz = Math.floor(sp.z);
-    let sy = 0;
+    let sy = -1;
     for (let yy = CFG.chunkY - 1; yy > 0; yy--) {
       const b = World.getBlock(sx, yy, sz);
-      if (b !== 0 && !BLOCKS[b].liquid) { sy = yy + 1; break; }
+      // 修复：要求实心、非液体，且上方 1 格不是实心（可站立），避免卡进方块
+      if (b !== 0 && BLOCKS[b].solid && !BLOCKS[b].liquid) {
+        const up = World.getBlock(sx, yy + 1, sz);
+        if (up === 0 || !BLOCKS[up].solid) { sy = yy + 1; break; }
+      }
     }
-    this.pos.set(sp.x, Math.max(sy, 4) + 0.1, sp.z);
+    if (sy < 0) sy = Math.max(World.surfaceY(sx, sz) + 1, 4);
+    this.pos.set(sp.x, sy + 0.1, sp.z);
     this.vel.set(0, 0, 0);
     this.fallStart = null;
     toast('已回到出生点', 1800);
@@ -3046,7 +3055,7 @@ const Interaction = {
     Game.sleeping = true;
     Game.sleepFrom = Sky.time;
     Game.sleepProgress = 0;
-    Player.spawnPoint = Player.pos.clone();
+    Player.spawnPoint = new THREE.Vector3(Player.pos.x, Player.pos.y - 0.5, Player.pos.z);
     SFX.play('sleep', 'dirt', 0.9);
     toast('晚安…', 1400);
   },
