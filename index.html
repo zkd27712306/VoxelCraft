@@ -2521,6 +2521,7 @@ const Player = {
     this.sel = 0;
     this.dead = false;
     this.shake = 0;
+	Inv.markDirty();
   },
   get reach() { return this.mode === 'creative' ? CFG.reachCreative : CFG.reachSurvival; },
   aabbMin(out) { out.set(this.pos.x - CFG.playerW / 2, this.pos.y, this.pos.z - CFG.playerW / 2); return out; },
@@ -2702,8 +2703,10 @@ const Player = {
       if (!s) continue;
       Drops.spawnStack(s, this.pos.x, this.pos.y + 1.0, this.pos.z,
         (Math.random() - 0.5) * 2.4, 2.4 + Math.random(), (Math.random() - 0.5) * 2.4);
-      this.inv[i] = null;
+     this.inv[i] = null;
     }
+    Inv.markDirty();
+    HUD.refreshHotbar();
     toast('你死了！物品掉落在死亡地点' + (cause ? '（' + cause + '）' : ''), 2800);
     Particles.burst(this.pos.x, this.pos.y + 1, this.pos.z, T.item_bone, 20, 3, 0.12, 0.9);
     this.health = this.maxHealth;
@@ -5876,8 +5879,11 @@ const HUD = {
   },
   update(dt) {
     if (Inv.dirty) { Inv.dirty = false; this.refreshHotbar(); }
+    this.hotbarSyncTimer = (this.hotbarSyncTimer || 0) + dt;
+    if (this.hotbarSyncTimer >= 1.0) { this.hotbarSyncTimer = 0; this.refreshHotbar(); }
     this.updateStats(false);
-    if (typeof UI !== 'undefined') UI.updateFeed(dt);
+	
+	if (typeof UI !== 'undefined') UI.updateFeed(dt);
     if (this.itemTimer > 0) {
       this.itemTimer -= dt;
       if (this.itemTimer <= 0) $('itemname').classList.remove('show');
