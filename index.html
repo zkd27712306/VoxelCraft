@@ -4222,7 +4222,7 @@ const Boats = {
             const nx = b.pos.x + b.vel.x * dt, ny = b.pos.y + b.vel.y * dt, nz = b.pos.z + b.vel.z * dt;
 
       // 船体 AABB：宽 1.5，高 0.5，中心在 pos
-      const hw = 0.75;
+      const hw = 0.5;
       const bodyBottom = b.pos.y - 0.15;
       const bodyTop = b.pos.y + 0.45;
       const solidAt = (x, y, z) => World.isSolid(Math.floor(x), Math.floor(y), Math.floor(z));
