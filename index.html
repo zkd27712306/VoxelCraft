@@ -4284,6 +4284,26 @@ const Boats = {
       }
 
       if (b.inWater) {
+              // 玩家坐船上按空格：给船一个向上推力
+      if (this.riding === b && Input.key('Space')) {
+        b.vel.y = Math.max(b.vel.y, 3.5);
+        // 顺便检查一下前方是不是水，如果是，就朝水方向推一点
+        // （只在岸边、按空格时生效，避免影响正常驾驶）
+        const bx = Math.floor(b.pos.x), by = Math.floor(b.pos.y), bz = Math.floor(b.pos.z);
+        const nearWater = (dx, dz) => {
+          const wx = bx + dx, wz = bz + dz;
+          const b1 = World.getBlock(wx, by, wz);
+          const b2 = World.getBlock(wx, by + 1, wz);
+          return (b1 !== 0 && BLOCKS[b1].liquid) || (b2 !== 0 && BLOCKS[b2].liquid);
+        };
+        // 如果前方有水，往水方向轻轻推
+        if (nearWater(-Math.round(Math.sin(b.yaw)), -Math.round(Math.cos(b.yaw)))) {
+          b.vel.x -= Math.sin(b.yaw) * 2.0;
+          b.vel.z -= Math.cos(b.yaw) * 2.0;
+        }
+      }
+
+      if (b.inWater) {
         // 浮力：向上推，并让船体底部贴水面
         const targetY = Math.floor(b.pos.y) + 0.05;
         b.vel.y = lerp(b.vel.y, 0, clamp(8 * dt, 0, 1));
@@ -4293,7 +4313,7 @@ const Boats = {
         if (b.vel.y < -20) b.vel.y = -20;
       }
 
-            const nx = b.pos.x + b.vel.x * dt, ny = b.pos.y + b.vel.y * dt, nz = b.pos.z + b.vel.z * dt;
+      const nx = b.pos.x + b.vel.x * dt, ny = b.pos.y + b.vel.y * dt, nz = b.pos.z + b.vel.z * dt;
 
       // 船体 AABB：宽 1.5，高 0.5，中心在 pos
       const hw = 0.75;
