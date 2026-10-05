@@ -4310,46 +4310,32 @@ const Boats = {
         return false;
       };
 
-        // ===== 1. 先算垂直 =====
-      if (b.vel.y <= 0) {
-        // 向下落：从 startY 往下扫，找安全落点
-        const startY = b.pos.y;
-        const targetY = ny;
-        let landY = null;
-        for (let y = startY; y >= targetY - 0.01; y -= 0.05) {
-          if (!boxHit(b.pos.x, y, b.pos.z)) {
-            landY = y;
-          } else {
-            break;
-          }
-        }
-        if (landY !== null) {
-          b.pos.y = landY;
-          b.onGround = (startY - landY) < 0.01;
-          if (b.onGround) b.vel.y = 0;
-        } else {
-          // 起始位置就不安全，吸附到最近的地面
-          let topY = Math.floor(b.pos.y + 0.45);
-          while (topY > 0) {
-            const testY = topY + 1 + 0.15;
-            if (!boxHit(b.pos.x, testY, b.pos.z)) { b.pos.y = testY; break; }
-            topY--;
-          }
-          b.onGround = true;
-          b.vel.y = 0;
-        }
-      } else {
-        if (boxHit(b.pos.x, ny, b.pos.z)) {
-          b.vel.y = 0;
-        } else {
-          b.pos.y = ny;
-          b.onGround = false;
-        }
-      }
-
-      // ===== 2. 再算水平（用刚算好的 b.pos.y） =====
+      // 水平移动：分 X / Z 独立检测，撞到就停
       if (!boxHit(nx, b.pos.y, b.pos.z)) b.pos.x = nx; else b.vel.x = 0;
       if (!boxHit(b.pos.x, b.pos.y, nz)) b.pos.z = nz; else b.vel.z = 0;
+
+        // 垂直移动
+      if (boxHit(b.pos.x, ny, b.pos.z)) {
+        if (b.vel.y <= 0) {
+          // 向下时：从当前 y 往下扫，找最下面的、AABB 不碰撞的 y
+          let landY = b.pos.y;
+          for (let y = b.pos.y; y >= ny - 0.01; y -= 0.05) {
+            if (!boxHit(b.pos.x, y, b.pos.z)) landY = y;
+            else break;
+          }
+          // 如果找到的落点明显低于起点（说明真的往下掉了），就用落点
+          if (b.pos.y - landY > 0.05) {
+            b.pos.y = landY;
+            b.onGround = false;
+          } else {
+            // 原地没动过，说明被挡住了，贴地
+            b.pos.y = landY;
+            b.onGround = true;
+          }
+        }
+        b.vel.y = 0;
+      } else { b.pos.y = ny; b.onGround = false; }
+
       // 边界保护
       if (b.pos.y < -4) { b.pos.y = CFG.seaLevel + 1.05; b.vel.set(0, 0, 0); }
 
