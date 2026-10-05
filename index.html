@@ -5674,11 +5674,13 @@ const Touch = {
       return;
     }
     if (act === 'place') { Input.mouse.right = down; return; }
-    if (!down) return;
     if (act === 'sneak') {
       Input.keys['ShiftLeft'] = down;
       this.mark('sneak', down);
-    } else if (act === 'inv') {
+      return;
+    }
+    if (!down) return;
+    if (act === 'inv') {
       if (UI.invOpen || UI.furnaceOpen || UI.chestOpen) UI.closeAll();
       else UI.openInv('inv');
     } else if (act === 'view') {
