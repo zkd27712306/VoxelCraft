@@ -2958,6 +2958,30 @@ const Interaction = {
     const freshClick = Input.leftEdge;
     Input.leftEdge = false;
     const canMine = Player.mode === 'creative' ? freshClick : Input.mouse.left;
+    // 左键打船：打两次掉落
+    if (canMine && busy && useBoat) {
+      this.swingActive = true;
+      setCrackStage(-1);
+      if (this.attackCooldown <= 0) {
+        this.attackCooldown = 0.42;
+        const held = Inv.held();
+        const dmg = held ? itemDmg(held.id) : 1;
+        bh.boat.hp -= dmg;
+        if (held && itemDurability(held.id) > 0) Inv.damageSel(1);
+        HUD.flashHit();
+        SFX.play('hit', 'wood', 0.9);
+        Particles.burst(bh.boat.pos.x, bh.boat.pos.y + 0.4, bh.boat.pos.z, T.boat_wood, 4, 2, 0.08, 0.4);
+        if (bh.boat.hp <= 0) {
+          Drops.spawn(I.boat, 1, bh.boat.pos.x, bh.boat.pos.y + 0.5, bh.boat.pos.z,
+            (Math.random() - 0.5) * 2, 2, (Math.random() - 0.5) * 2);
+          Particles.burst(bh.boat.pos.x, bh.boat.pos.y + 0.4, bh.boat.pos.z, T.boat_wood, 14, 3, 0.1, 0.8);
+          SFX.play('break', 'wood', 1.2);
+          Boats.remove(bh.boat);
+        }
+      }
+      this.swing += dt * 6.5;
+      return;
+    }
     if (canMine && busy && useMob) {
       this.swingActive = true;
       setCrackStage(-1);
@@ -4212,16 +4236,22 @@ const Boats = {
       mesh: mesh,
       onGround: false,
       inWater: false,
-      lightTimer: Math.random() * 0.4
+      lightTimer: Math.random() * 0.4,
+      hp: 2
     };
     this.list.push(b);
     if (fromPlayer) SFX.play('place', 'wood', 1.0);
     return b;
   },
-  remove(b) {
+    remove(b) {
     const i = this.list.indexOf(b);
     if (i >= 0) this.list.splice(i, 1);
-    if (this.riding === b) this.riding = null;
+    if (this.riding === b) {
+      this.riding = null;
+      const py = Math.max(World.surfaceY(Math.floor(b.pos.x), Math.floor(b.pos.z)) + 1.1, b.pos.y + 0.5);
+      Player.pos.set(b.pos.x, py, b.pos.z);
+      Player.vel.set(0, 0, 0);
+    }
     scene.remove(b.mesh);
   },
   mount(b) {
@@ -4284,25 +4314,6 @@ const Boats = {
       }
 
       if (b.inWater) {
-              // 玩家坐船上按空格：给船一个向上推力
-      if (this.riding === b && Input.key('Space')) {
-        b.vel.y = Math.max(b.vel.y, 3.5);
-        // 顺便检查一下前方是不是水，如果是，就朝水方向推一点
-        // （只在岸边、按空格时生效，避免影响正常驾驶）
-        const bx = Math.floor(b.pos.x), by = Math.floor(b.pos.y), bz = Math.floor(b.pos.z);
-        const nearWater = (dx, dz) => {
-          const wx = bx + dx, wz = bz + dz;
-          const b1 = World.getBlock(wx, by, wz);
-          const b2 = World.getBlock(wx, by + 1, wz);
-          return (b1 !== 0 && BLOCKS[b1].liquid) || (b2 !== 0 && BLOCKS[b2].liquid);
-        };
-        // 如果前方有水，往水方向轻轻推
-        if (nearWater(-Math.round(Math.sin(b.yaw)), -Math.round(Math.cos(b.yaw)))) {
-          b.vel.x -= Math.sin(b.yaw) * 2.0;
-          b.vel.z -= Math.cos(b.yaw) * 2.0;
-        }
-      }
-
         // 浮力：向上推，并让船体底部贴水面
         const targetY = Math.floor(b.pos.y) + 0.05;
         b.vel.y = lerp(b.vel.y, 0, clamp(8 * dt, 0, 1));
@@ -4312,7 +4323,7 @@ const Boats = {
         if (b.vel.y < -20) b.vel.y = -20;
       }
 
-      const nx = b.pos.x + b.vel.x * dt, ny = b.pos.y + b.vel.y * dt, nz = b.pos.z + b.vel.z * dt;
+            const nx = b.pos.x + b.vel.x * dt, ny = b.pos.y + b.vel.y * dt, nz = b.pos.z + b.vel.z * dt;
 
       // 船体 AABB：宽 1.5，高 0.5，中心在 pos
       const hw = 0.75;
@@ -4329,15 +4340,9 @@ const Boats = {
         return false;
       };
 
-        // 水平移动：水面或水中放行，避免在岸边卡住
-      const waterAt = (x, y, z) => {
-        const bx = Math.floor(x), by = Math.floor(y), bz = Math.floor(z);
-        const b1 = World.getBlock(bx, by, bz);
-        const b2 = World.getBlock(bx, by + 1, bz);
-        return (b1 !== 0 && BLOCKS[b1].liquid) || (b2 !== 0 && BLOCKS[b2].liquid);
-      };
-      if (!boxHit(nx, b.pos.y, b.pos.z) || waterAt(nx, b.pos.y, b.pos.z)) b.pos.x = nx; else b.vel.x = 0;
-      if (!boxHit(b.pos.x, b.pos.y, nz) || waterAt(b.pos.x, b.pos.y, nz)) b.pos.z = nz; else b.vel.z = 0;
+      // 水平移动：分 X / Z 独立检测，撞到就停
+      if (!boxHit(nx, b.pos.y, b.pos.z)) b.pos.x = nx; else b.vel.x = 0;
+      if (!boxHit(b.pos.x, b.pos.y, nz)) b.pos.z = nz; else b.vel.z = 0;
 
         // 垂直移动
       if (boxHit(b.pos.x, ny, b.pos.z)) {
