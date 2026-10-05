@@ -4314,24 +4314,36 @@ const Boats = {
       if (!boxHit(nx, b.pos.y, b.pos.z)) b.pos.x = nx; else b.vel.x = 0;
       if (!boxHit(b.pos.x, b.pos.y, nz)) b.pos.z = nz; else b.vel.z = 0;
 
-        // 垂直移动：允许向下掉一格（陆地拖行不卡台阶）
+     // 垂直移动：用 AABB 完整检测，避免半埋进方块
       if (boxHit(b.pos.x, ny, b.pos.z)) {
         if (b.vel.y <= 0) {
-          // 尝试向下探 1 格，看能不能落下去
-          const stepDown = 1.05;
-          const tryY = b.pos.y - stepDown;
-          if (!boxHit(b.pos.x, tryY, b.pos.z)) {
-            // 下方一格空间足够，直接掉下去
-            b.pos.y = tryY;
-            b.vel.y = 0;
+          // 从当前位置逐步向下探测，找到最接近的、不碰撞的 y
+          let found = false;
+          const startY = b.pos.y;
+          for (let dy = 0.05; dy <= 1.2; dy += 0.05) {
+            const testY = startY - dy;
+            if (!boxHit(b.pos.x, testY, b.pos.z)) {
+              b.pos.y = testY;
+              found = true;
+              b.onGround = true;
+              b.vel.y = 0;
+              break;
+            }
+          }
+          if (!found) {
+            // 实在落不下去，吸附到当前方块顶面（用 AABB 扫过的最高点）
+            let topY = Math.floor(b.pos.y + 0.45);
+            while (topY > 0) {
+              // 检查 topY 这一层是否安全
+              const testY = topY + 1 + 0.15;
+              if (!boxHit(b.pos.x, testY, b.pos.z)) {
+                b.pos.y = testY;
+                break;
+              }
+              topY--;
+            }
             b.onGround = true;
-          } else {
-            // 确实落不下去，吸附到方块顶面
-            let topY = Math.floor(ny + 0.45);
-            while (topY > 0 && !solidAt(b.pos.x, topY, b.pos.z)) topY--;
-            b.pos.y = topY + 1 + 0.15;
             b.vel.y = 0;
-            b.onGround = true;
           }
         } else {
           b.vel.y = 0;
