@@ -4314,17 +4314,32 @@ const Boats = {
       if (!boxHit(nx, b.pos.y, b.pos.z)) b.pos.x = nx; else b.vel.x = 0;
       if (!boxHit(b.pos.x, b.pos.y, nz)) b.pos.z = nz; else b.vel.z = 0;
 
-      // 垂直移动
+        // 垂直移动：允许向下掉一格（陆地拖行不卡台阶）
       if (boxHit(b.pos.x, ny, b.pos.z)) {
         if (b.vel.y <= 0) {
-          // 落在方块顶面
-          let topY = Math.floor(ny + 0.45);
-          while (topY > 0 && !solidAt(b.pos.x, topY, b.pos.z)) topY--;
-          b.pos.y = topY + 1 + 0.15;
-          b.onGround = true;
+          // 尝试向下探 1 格，看能不能落下去
+          const stepDown = 1.05;
+          const tryY = b.pos.y - stepDown;
+          if (!boxHit(b.pos.x, tryY, b.pos.z)) {
+            // 下方一格空间足够，直接掉下去
+            b.pos.y = tryY;
+            b.vel.y = 0;
+            b.onGround = true;
+          } else {
+            // 确实落不下去，吸附到方块顶面
+            let topY = Math.floor(ny + 0.45);
+            while (topY > 0 && !solidAt(b.pos.x, topY, b.pos.z)) topY--;
+            b.pos.y = topY + 1 + 0.15;
+            b.vel.y = 0;
+            b.onGround = true;
+          }
+        } else {
+          b.vel.y = 0;
         }
-        b.vel.y = 0;
-      } else { b.pos.y = ny; b.onGround = false; }
+      } else {
+        b.pos.y = ny;
+        b.onGround = false;
+      }
 
       // 边界保护
       if (b.pos.y < -4) { b.pos.y = CFG.seaLevel + 1.05; b.vel.set(0, 0, 0); }
