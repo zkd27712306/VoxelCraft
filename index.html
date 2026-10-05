@@ -1445,7 +1445,26 @@ const Village = {
       const x = gi * span + 24 + Math.floor(rnd() * (span - 48));
       const z = gj * span + 24 + Math.floor(rnd() * (span - 48));
       const y = WorldGen.heightAt(x, z);
-      if (y > CFG.seaLevel + 1 && y < 150) site = { x: x, z: z, y: y, seed: (Math.imul(gi, 73856093) ^ Math.imul(gj, 19349663)) >>> 0 };
+      if (y > CFG.seaLevel + 1 && y < 150) {
+        // 确保区块已生成，否则 getBlock 会误判为空气
+        let c = World.getChunk(x >> 4, z >> 4);
+        if (!c) c = World.ensureChunk(x >> 4, z >> 4);
+        if (!c.generated) { try { World.generateChunk(c); } catch (e) { } }
+        // 检查该点地表是否为陆地（非水、非空气）
+        let onLand = true;
+        const top = World.getBlock(x, y, z);
+        if (top === ID.WATER || top === 0) onLand = false;
+        // 再检查周围 ±3 格内有没有水，避免生成在海边/湖上
+        if (onLand) {
+          for (let dz = -3; dz <= 3 && onLand; dz++) {
+            for (let dx = -3; dx <= 3; dx++) {
+              const b = World.getBlock(x + dx, y, z + dz);
+              if (b === ID.WATER) { onLand = false; break; }
+            }
+          }
+        }
+        if (onLand) site = { x: x, z: z, y: y, seed: (Math.imul(gi, 73856093) ^ Math.imul(gj, 19349663)) >>> 0 };
+      }
     }
     if (this._cache.size > 512) this._cache.clear();
     this._cache.set(key, site);
