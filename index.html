@@ -4310,33 +4310,25 @@ const Boats = {
         return false;
       };
 
-      // 水平移动：分 X / Z 独立检测，撞到就停
-      if (!boxHit(nx, b.pos.y, b.pos.z)) b.pos.x = nx; else b.vel.x = 0;
-      if (!boxHit(b.pos.x, b.pos.y, nz)) b.pos.z = nz; else b.vel.z = 0;
-
-        // 垂直移动：一次算准落点，避免反复弹跳
+        // ===== 1. 先算垂直 =====
       if (b.vel.y <= 0) {
-        // 向下落：从当前 y 往下扫，找到第一个安全 y 作为落点
+        // 向下落：从 startY 往下扫，找安全落点
         const startY = b.pos.y;
         const targetY = ny;
         let landY = null;
-        // 从 targetY 开始，向 startY 方向找最近的安全位置
         for (let y = startY; y >= targetY - 0.01; y -= 0.05) {
           if (!boxHit(b.pos.x, y, b.pos.z)) {
             landY = y;
           } else {
-            // 一旦碰到实心，就不再继续往下
             break;
           }
         }
-        if (landY !== null && landY <= startY) {
+        if (landY !== null) {
           b.pos.y = landY;
-          // 如果落点明显低于起点（掉下去了），允许继续受重力
-          if (startY - landY > 0.01) {
-            b.onGround = false;
-          }
+          b.onGround = (startY - landY) < 0.01;
+          if (b.onGround) b.vel.y = 0;
         } else {
-          // 下方无处可落，吸附到最近的地面
+          // 起始位置就不安全，吸附到最近的地面
           let topY = Math.floor(b.pos.y + 0.45);
           while (topY > 0) {
             const testY = topY + 1 + 0.15;
@@ -4344,10 +4336,9 @@ const Boats = {
             topY--;
           }
           b.onGround = true;
+          b.vel.y = 0;
         }
-        b.vel.y = 0;
       } else {
-        // 向上：简单碰撞检测
         if (boxHit(b.pos.x, ny, b.pos.z)) {
           b.vel.y = 0;
         } else {
@@ -4356,6 +4347,9 @@ const Boats = {
         }
       }
 
+      // ===== 2. 再算水平（用刚算好的 b.pos.y） =====
+      if (!boxHit(nx, b.pos.y, b.pos.z)) b.pos.x = nx; else b.vel.x = 0;
+      if (!boxHit(b.pos.x, b.pos.y, nz)) b.pos.z = nz; else b.vel.z = 0;
       // 边界保护
       if (b.pos.y < -4) { b.pos.y = CFG.seaLevel + 1.05; b.vel.set(0, 0, 0); }
 
