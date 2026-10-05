@@ -4310,9 +4310,15 @@ const Boats = {
         return false;
       };
 
-      // 水平移动：分 X / Z 独立检测，撞到就停
-      if (!boxHit(nx, b.pos.y, b.pos.z)) b.pos.x = nx; else b.vel.x = 0;
-      if (!boxHit(b.pos.x, b.pos.y, nz)) b.pos.z = nz; else b.vel.z = 0;
+        // 水平移动：水面或水中放行，避免在岸边卡住
+      const waterAt = (x, y, z) => {
+        const bx = Math.floor(x), by = Math.floor(y), bz = Math.floor(z);
+        const b1 = World.getBlock(bx, by, bz);
+        const b2 = World.getBlock(bx, by + 1, bz);
+        return (b1 !== 0 && BLOCKS[b1].liquid) || (b2 !== 0 && BLOCKS[b2].liquid);
+      };
+      if (!boxHit(nx, b.pos.y, b.pos.z) || waterAt(nx, b.pos.y, b.pos.z)) b.pos.x = nx; else b.vel.x = 0;
+      if (!boxHit(b.pos.x, b.pos.y, nz) || waterAt(b.pos.x, b.pos.y, nz)) b.pos.z = nz; else b.vel.z = 0;
 
         // 垂直移动
       if (boxHit(b.pos.x, ny, b.pos.z)) {
