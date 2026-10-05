@@ -2965,8 +2965,7 @@ const Interaction = {
       if (this.attackCooldown <= 0) {
         this.attackCooldown = 0.42;
         const held = Inv.held();
-        const dmg = held ? itemDmg(held.id) : 1;
-        bh.boat.hp -= dmg;
+        bh.boat.hp -= 1;
         if (held && itemDurability(held.id) > 0) Inv.damageSel(1);
         HUD.flashHit();
         SFX.play('hit', 'wood', 0.9);
