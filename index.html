@@ -3086,7 +3086,7 @@ const Interaction = {
     return false;
   },
   trySleep() {
-    if (Sky.dayFactor > 0.55) { toast('你只能在夜间睡觉', 1800); return; }
+    const isNight = Sky.dayFactor <= 0.55;
     let threat = 0;
     for (const m of Mobs.list) {
       if (!m.type.hostile) continue;
@@ -3094,9 +3094,7 @@ const Interaction = {
       if (d2 < 12 * 12) threat++;
     }
     if (threat > 0) { toast('周围有 ' + threat + ' 只怪物，无法入睡', 2000); return; }
-    Game.sleeping = true;
-    Game.sleepFrom = Sky.time;
-    Game.sleepProgress = 0;
+    // 绑定床作为出生点：记录床脚方块的位置
     if (Interaction.target) {
       const t = Interaction.target;
       const id = World.getBlock(t.x, t.y, t.z);
@@ -3109,8 +3107,16 @@ const Interaction = {
         Player.bedSpawn = { x: bx, y: by, z: bz };
       }
     }
-    SFX.play('sleep', 'dirt', 0.9);
-    toast('晚安… 出生点已设为这张床', 1800);
+    if (isNight) {
+      Game.sleeping = true;
+      Game.sleepFrom = Sky.time;
+      Game.sleepProgress = 0;
+      SFX.play('sleep', 'dirt', 0.9);
+      toast('晚安… 出生点已设为这张床', 1800);
+    } else {
+      SFX.play('sleep', 'dirt', 0.6);
+      toast('出生点已设为这张床', 1800);
+    }
   },
   breakBlock(x, y, z, id, heldId) {
     const def = BLOCKS[id];
