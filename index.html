@@ -4303,7 +4303,6 @@ const Boats = {
         }
       }
 
-      if (b.inWater) {
         // 浮力：向上推，并让船体底部贴水面
         const targetY = Math.floor(b.pos.y) + 0.05;
         b.vel.y = lerp(b.vel.y, 0, clamp(8 * dt, 0, 1));
