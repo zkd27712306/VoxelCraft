@@ -2513,7 +2513,8 @@ const Player = {
   hurtCooldown: 0, regenTimer: 0, starveTimer: 0, drownTimer: 0, lavaTimer: 0,
   walkDist: 0,
   lastBlock: 0,
-  spawnPoint: null,
+  worldSpawn: null,
+  bedSpawn: null,
   reset(x, y, z) {
     this.pos.set(x, y, z); this.vel.set(0, 0, 0);
     this.health = 20; this.food = 20; this.breath = 10; this.saturation = 5;
@@ -2714,20 +2715,12 @@ const Player = {
     this.food = this.maxFood;
     this.breath = this.maxBreath;
     this.saturation = 5;
-    // 死亡后回到出生点
-    const sp = this.spawnPoint || new THREE.Vector3(8.5, 100, 8.5);
-    const sx = Math.floor(sp.x), sz = Math.floor(sp.z);
-    let sy = -1;
-    for (let yy = CFG.chunkY - 1; yy > 0; yy--) {
-      const b = World.getBlock(sx, yy, sz);
-      // 修复：要求实心、非液体，且上方 1 格不是实心（可站立），避免卡进方块
-      if (b !== 0 && BLOCKS[b].solid && !BLOCKS[b].liquid) {
-        const up = World.getBlock(sx, yy + 1, sz);
-        if (up === 0 || !BLOCKS[up].solid) { sy = yy + 1; break; }
-      }
-    }
-    if (sy < 0) sy = Math.max(World.surfaceY(sx, sz) + 1, 4);
-    this.pos.set(sp.x, sy + 0.1, sp.z);
+    // 死亡后回到出生点（有床→床；没床→世界初始点）
+    const rp = resolveRespawnPoint();
+    const sx = Math.floor(rp.x), sz = Math.floor(rp.z);
+    ensureChunkAt(sx, sz);
+    const sy = findSafeStandY(sx, sz, Math.floor(rp.y) + 2);
+    this.pos.set(rp.x, sy + 0.05, rp.z);
     this.vel.set(0, 0, 0);
     this.fallStart = null;
     toast('已回到出生点', 1800);
@@ -2870,6 +2863,59 @@ function raycastVoxel(origin, dir, maxDist) {
 }
 
 /* ======================= 15. 交互 ======================================== */
+/* ===== 出生点安全查找（最小版） ===== */
+function findSafeStandY(x, z, fromY) {
+  const startY = Math.min(CFG.chunkY - 3, Math.max(1, fromY || CFG.chunkY - 2));
+  const hw = CFG.playerW / 2 - 1e-4;
+  const fits = (px, py, pz) => {
+    const x0 = Math.floor(px - hw), x1 = Math.floor(px + hw);
+    const y0 = Math.floor(py + 1e-4), y1 = Math.floor(py + CFG.playerH - 1e-4);
+    const z0 = Math.floor(pz - hw), z1 = Math.floor(pz + hw);
+    for (let yy = y0; yy <= y1; yy++) {
+      if (yy < 0) return false;
+      if (yy >= CFG.chunkY) continue;
+      for (let zz = z0; zz <= z1; zz++)
+        for (let xx = x0; xx <= x1; xx++) {
+          const b = World.getBlock(xx, yy, zz);
+          if (b !== 0 && BLOCKS[b].solid) return false;
+        }
+    }
+    return true;
+  };
+  const ok = (gx, gy, gz) => {
+    const b = World.getBlock(gx, gy, gz);
+    if (b === 0) return false;
+    const d = BLOCKS[b];
+    if (!d.solid || d.liquid) return false;
+    if (d.render === 'cross') return false;
+    if (b === ID.LEAVES || b === ID.CACTUS) return false;
+    return true;
+  };
+  const px = x + 0.5, pz = z + 0.5;
+  for (let y = startY; y > 0; y--) if (ok(x, y, z) && fits(px, y + 1, pz)) return y + 1;
+  for (let y = CFG.chunkY - 3; y > 0; y--) if (ok(x, y, z) && fits(px, y + 1, pz)) return y + 1;
+  return CFG.seaLevel + 3;
+}
+function ensureChunkAt(x, z) {
+  const cx = x >> 4, cz = z >> 4;
+  for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+    let c = World.getChunk(cx + dx, cz + dz);
+    if (!c) c = World.ensureChunk(cx + dx, cz + dz);
+    if (!c.generated) { try { World.generateChunk(c); } catch (e) { } }
+  }
+}
+function resolveRespawnPoint() {
+  if (Player.bedSpawn) {
+    const b = Player.bedSpawn;
+    const id = World.getBlock(b.x, b.y, b.z);
+    if (id === ID.BED || id === ID.BED_HEAD) return { x: b.x + 0.5, y: b.y + 1, z: b.z + 0.5 };
+    Player.bedSpawn = null;
+    toast('床已被破坏，出生点重置为世界初始点', 2200);
+  }
+  if (Player.worldSpawn) return { x: Player.worldSpawn.x, y: Player.worldSpawn.y, z: Player.worldSpawn.z };
+  return { x: 8.5, y: CFG.seaLevel + 3, z: 8.5 };
+}
+
 const Interaction = {
   target: null,
   mobTarget: null,
@@ -3051,9 +3097,20 @@ const Interaction = {
     Game.sleeping = true;
     Game.sleepFrom = Sky.time;
     Game.sleepProgress = 0;
-    Player.spawnPoint = new THREE.Vector3(Player.pos.x, Player.pos.y - 0.5, Player.pos.z);
+    if (Interaction.target) {
+      const t = Interaction.target;
+      const id = World.getBlock(t.x, t.y, t.z);
+      if (id === ID.BED || id === ID.BED_HEAD) {
+        let bx = t.x, by = t.y, bz = t.z;
+        if (id === ID.BED_HEAD) {
+          const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+          for (const d of dirs) if (World.getBlock(t.x + d[0], t.y, t.z + d[1]) === ID.BED) { bx = t.x + d[0]; bz = t.z + d[1]; break; }
+        }
+        Player.bedSpawn = { x: bx, y: by, z: bz };
+      }
+    }
     SFX.play('sleep', 'dirt', 0.9);
-    toast('晚安…', 1400);
+    toast('晚安… 出生点已设为这张床', 1800);
   },
   breakBlock(x, y, z, id, heldId) {
     const def = BLOCKS[id];
@@ -3079,6 +3136,12 @@ const Interaction = {
           World.setBlock(x + d[0], y, z + d[1], 0, true);
           break;
         }
+      }
+      if (Player.bedSpawn) {
+        const b = Player.bedSpawn;
+        let hit = (b.x === x && b.y === y && b.z === z);
+        for (const d of dirs) if (b.x === x + d[0] && b.y === y && b.z === z + d[1]) hit = true;
+        if (hit) { Player.bedSpawn = null; toast('床被破坏，出生点已重置', 2000); }
       }
     }
     const above = World.getBlock(x, y + 1, z);
@@ -4298,7 +4361,23 @@ const Boats = {
     }
     return best ? { boat: best, dist: bestT } : null;
   },
-  clear() { for (const b of this.list) scene.remove(b.mesh); this.list.length = 0; this.riding = null; }
+    clear() { for (const b of this.list) scene.remove(b.mesh); this.list.length = 0; this.riding = null; },
+  serialize() {
+    const arr = [];
+    for (const b of this.list) arr.push([+b.pos.x.toFixed(2), +b.pos.y.toFixed(2), +b.pos.z.toFixed(2), +b.yaw.toFixed(3)]);
+    return arr;
+  },
+  deserialize(arr) {
+    this.clear();
+    if (!Array.isArray(arr)) return;
+    for (const a of arr) {
+      if (!a || a.length < 4) continue;
+      const x = +a[0], y = +a[1], z = +a[2], yaw = +a[3];
+      if (!isFinite(x) || !isFinite(y) || !isFinite(z)) continue;
+      ensureChunkAt(Math.floor(x), Math.floor(z));
+      this.spawn(x, y, z, yaw, false);
+    }
+  }
 };
 
 /* ======================= 15.8 生物 ====================================== */
@@ -5954,7 +6033,10 @@ const Save = {
       },
       mods: mods,
       furnaces: Furnaces.serialize(),
-      chests: Chests.serialize()
+      chests: Chests.serialize(),
+      boats: Boats.serialize(),
+      bedSpawn: Player.bedSpawn ? [Player.bedSpawn.x, Player.bedSpawn.y, Player.bedSpawn.z] : null,
+      worldSpawn: Player.worldSpawn ? [Player.worldSpawn.x, Player.worldSpawn.y, Player.worldSpawn.z] : null
     };
   },
   saveLocal(silent) {
@@ -5996,6 +6078,7 @@ const Save = {
     }
     if (!Array.isArray(d.furnaces)) d.furnaces = [];
     if (!Array.isArray(d.chests)) d.chests = [];
+    if (!Array.isArray(d.boats)) d.boats = [];
     return true;
   },
   download(data) {
@@ -6385,12 +6468,13 @@ const Game = {
     $('loadTxt').textContent = '初始化世界…';
     const seed = (this.autoSeed !== null && this.autoSeed !== undefined) ? (this.autoSeed >>> 0)
       : (saveData && typeof saveData.seed === 'number' ? (saveData.seed >>> 0) : ((Math.random() * 0x7fffffff) | 0));
-    World.reset();
+	World.reset();
     Mobs.clear();
     Drops.clear();
     Arrows.clear();
-	Boats.clear();
-    Player.spawnPoint = null;
+    Boats.clear();
+    Player.bedSpawn = null;
+    Player.worldSpawn = null;
     if (UI.invOpen || UI.furnaceOpen) UI.closeAll();
     UI.held = null;
     Particles.count = 0;
@@ -6434,8 +6518,15 @@ const Game = {
       Player.breath = clamp(+p.breath === undefined ? 10 : +p.breath, 0, 10);
       if (Array.isArray(p.inv)) Inv.deserialize(p.inv);
       Player.sel = clamp(+p.sel || 0, 0, 8);
-      Furnaces.deserialize(saveData.furnaces);
+            Furnaces.deserialize(saveData.furnaces);
       Chests.deserialize(saveData.chests);
+      Boats.deserialize(saveData.boats);
+      if (Array.isArray(saveData.bedSpawn) && saveData.bedSpawn.length >= 3) {
+        Player.bedSpawn = { x: saveData.bedSpawn[0] | 0, y: saveData.bedSpawn[1] | 0, z: saveData.bedSpawn[2] | 0 };
+      }
+      if (Array.isArray(saveData.worldSpawn) && saveData.worldSpawn.length >= 3) {
+        Player.worldSpawn = new THREE.Vector3(+saveData.worldSpawn[0], +saveData.worldSpawn[1], +saveData.worldSpawn[2]);
+      }
     }
     HUD.refreshHotbar();
     this.pendingSave = saveData || null;
@@ -6472,7 +6563,7 @@ const Game = {
         else Player.pos.set(sx + 0.5, World.surfaceY(sx, sz) + 1.2, sz + 0.5);
       }
       Player.vel.set(0, 0, 0);
-      Player.spawnPoint = Player.pos.clone();
+      if (!Player.worldSpawn) Player.worldSpawn = Player.pos.clone();
       this.spawned = true;
     }
     if (this.spawned && ok >= need) this.finishLoading();
@@ -6487,12 +6578,16 @@ const Game = {
           const x = wx + dx, z = wz + dz;
           const c = World.getChunk(x >> 4, z >> 4);
           if (!c || !c.generated) continue;
-          const y = World.surfaceY(x, z);
+          const y = findSafeStandY(x, z, CFG.chunkY - 2);
           if (y <= CFG.seaLevel + 1) continue;
-          let open = 0;
-          for (let k = 1; k <= 4; k++) { if (World.getBlock(x, y + k, z) === 0) open++; else break; }
-          if (open < 3) continue;
-          if (y > bestY) { bestY = y; best = { x: x + 0.5, y: y + 1.02, z: z + 0.5 }; }
+          let skylit = false;
+          for (let k = 0; k < 3; k++) {
+            const up = World.getBlock(x, y + k, z);
+            if (up === 0) { skylit = true; break; }
+            if (BLOCKS[up].opaque) break;
+          }
+          if (!skylit) continue;
+          if (y > bestY) { bestY = y; best = { x: x + 0.5, y: y + 0.05, z: z + 0.5 }; }
           if (r <= 4) return best;
         }
       }
