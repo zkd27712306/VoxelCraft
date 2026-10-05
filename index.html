@@ -5676,9 +5676,8 @@ const Touch = {
     if (act === 'place') { Input.mouse.right = down; return; }
     if (!down) return;
     if (act === 'sneak') {
-      const on = !Input.keys['ShiftLeft'];
-      Input.keys['ShiftLeft'] = on;
-      this.mark('sneak', on);
+      Input.keys['ShiftLeft'] = down;
+      this.mark('sneak', down);
     } else if (act === 'inv') {
       if (UI.invOpen || UI.furnaceOpen || UI.chestOpen) UI.closeAll();
       else UI.openInv('inv');
