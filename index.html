@@ -141,6 +141,98 @@ body.touch #debug{font-size:11.5px;max-width:62vw;white-space:pre-wrap}
 body.touch .slot{width:44px;height:44px}
 body.touch .slot{pointer-events:auto}
 @media (max-width:760px){#bars{width:min(432px,86vw)}.help{columns:1}}
+
+/* ================= 手机窄屏适配 ================= */
+@media (max-width:560px){
+  .panel{width:96vw;padding:12px 12px;max-height:92vh}
+  .panel h1{font-size:24px;letter-spacing:1px;margin-bottom:2px}
+  .panel h2{font-size:16px;margin-bottom:10px}
+  .panel .sub{font-size:11px;margin-bottom:12px}
+  .row{font-size:12px;margin:7px 0;gap:7px}
+  .row label{flex:0 0 92px;font-size:12px}
+  .row .val{flex:0 0 46px;font-size:12px}
+  .btns{gap:7px;margin-top:11px}
+  button{font-size:13px;padding:8px 10px}
+  .help{font-size:11px;line-height:1.55;margin-top:12px;padding-top:9px}
+  #debug{font-size:10.5px;line-height:1.35;padding:4px 6px;max-width:56vw}
+  #toast{font-size:12px;padding:6px 10px;max-width:92vw;line-height:1.5}
+  #itemname{font-size:12px;bottom:58px}
+  .slot{width:38px;height:38px}
+  .slot canvas{width:31px;height:31px}
+  .slot .num{font-size:8px}
+  .slot .cnt{font-size:10px}
+  .slot .nm{font-size:9px}
+  .ico{width:16px;height:16px}
+  #bars{bottom:66px;gap:12px}
+  body.touch #hotbar{bottom:68px}
+  body.touch #bars{bottom:128px}
+  body.touch #itemname{bottom:118px}
+  body.touch .slot{width:36px;height:36px}
+  body.touch .slot canvas{width:29px;height:29px}
+  #mobileUI .mbtn{font-size:12px}
+  #joyPad{width:112px;height:112px;left:12px;bottom:12px}
+  #joyKnob{width:46px;height:46px;margin:-23px 0 0 -23px}
+  #mobBtns{right:12px;bottom:12px;grid-template-columns:repeat(2,56px);gap:8px}
+  #mobBtns .mbtn{width:56px;height:56px;font-size:13px}
+  #mobTop{right:10px;top:10px;gap:6px}
+  #mobTop .mbtn{width:40px;height:40px;font-size:11px}
+  #pickerPanel{width:96vw}
+  #pickerGrid{grid-template-columns:repeat(auto-fill,minmax(46px,1fr));gap:4px}
+  #screenInv .panel,#screenFurnace .panel{width:98vw}
+  .grid9{grid-template-columns:repeat(9,34px);gap:2px}
+  .grid3{grid-template-columns:repeat(3,34px);gap:2px}
+  .grid2{grid-template-columns:repeat(2,34px);gap:2px}
+  .islot{width:34px;height:34px}
+  .islot canvas{width:26px;height:26px}
+  .islot .cnt{font-size:10px}
+  .inv-hint{font-size:10.5px;margin-top:9px;line-height:1.6}
+  .craft-row{gap:10px}
+  .arrow-r{font-size:18px}
+  .furnace-row{gap:10px;margin:10px 0 14px}
+  .flame{width:15px;height:20px}
+  .bar-wrap{width:62px;height:12px}
+}
+
+@media (max-width:400px){
+  .panel{width:98vw;padding:10px 8px}
+  .panel h1{font-size:20px;letter-spacing:0}
+  .panel h2{font-size:14px}
+  .panel .sub{font-size:10px}
+  .row{font-size:11px;margin:6px 0}
+  .row label{flex:0 0 74px;font-size:11px}
+  .row .val{flex:0 0 40px;font-size:11px}
+  button{font-size:12px;padding:7px 8px}
+  .help{font-size:10.5px}
+  #debug{font-size:10px;max-width:58vw}
+  .slot{width:34px;height:34px}
+  .slot canvas{width:28px;height:28px}
+  body.touch .slot{width:32px;height:32px}
+  body.touch .slot canvas{width:26px;height:26px}
+  #joyPad{width:96px;height:96px}
+  #joyKnob{width:40px;height:40px;margin:-20px 0 0 -20px}
+  #mobBtns{grid-template-columns:repeat(2,48px);gap:6px}
+  #mobBtns .mbtn{width:48px;height:48px;font-size:12px}
+  #mobTop .mbtn{width:36px;height:36px;font-size:10px}
+  .grid9{grid-template-columns:repeat(9,30px)}
+  .grid3{grid-template-columns:repeat(3,30px)}
+  .grid2{grid-template-columns:repeat(2,30px)}
+  .islot{width:30px;height:30px}
+  .islot canvas{width:23px;height:23px}
+}
+
+@media (orientation:landscape) and (max-height:500px){
+  #joyPad{width:96px;height:96px;left:10px;bottom:8px}
+  #joyKnob{width:40px;height:40px;margin:-20px 0 0 -20px}
+  #mobBtns{right:10px;bottom:8px;grid-template-columns:repeat(2,50px);gap:6px}
+  #mobBtns .mbtn{width:50px;height:50px;font-size:12px}
+  #mobTop{right:8px;top:8px;gap:5px}
+  #mobTop .mbtn{width:36px;height:36px;font-size:10px}
+  body.touch #hotbar{bottom:60px}
+  body.touch #bars{bottom:116px}
+  body.touch #itemname{bottom:108px}
+  .slot{width:36px;height:36px}
+  .slot canvas{width:29px;height:29px}
+}
 #errbar{position:fixed;left:0;right:0;bottom:0;z-index:99;background:#7a1d1d;color:#ffdede;font-size:12px;padding:6px 10px;white-space:pre-wrap;max-height:32vh;overflow:auto;display:none}
 #errbar.show{display:block}
 #diagdump{display:none}
@@ -1958,7 +2050,10 @@ function sampleLightAt(gx, gy, gz, fbSky, fbBlk) {
 function faceVisible(self, nb) {
   if (nb === 0) return true;
   if (nb === self) return false;
-  return !BLOCKS[nb].opaque;
+  const sd = BLOCKS[self];
+  const nd = BLOCKS[nb];
+  if (sd.id === ID.LAVA && nd.opaque && !nd.liquid) return true;
+  return !nd.opaque;
 }
 function buildPad(chunk) {
   const padY = Math.min(CFG.chunkY, chunk.maxY + 3);
@@ -1985,6 +2080,136 @@ function buildPad(chunk) {
   return padY;
 }
 function meshChunk(chunk) {
+  function estimateNeighborBlockLight(nch, lx, y, lz) {
+  const wx = nch.cx * 16 + lx;
+  const wz = nch.cz * 16 + lz;
+  let best = 0;
+  for (let dz = -1; dz <= 1; dz++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const c2 = World.getChunk(nch.cx + dx, nch.cz + dz);
+      if (!c2 || !c2.generated || !c2.emitters || !c2.emitters.length) continue;
+      const ox = c2.cx * 16, oz = c2.cz * 16;
+      for (let i = 0; i < c2.emitters.length; i++) {
+        const e = c2.emitters[i];
+        const ex = ox + unpackX(e), ey = unpackY(e), ez = oz + unpackZ(e);
+        const d = Math.abs(ex - wx) + Math.abs(ey - y) + Math.abs(ez - wz);
+        if (d >= 15) continue;
+        const lv = unpackL(e) - d;
+        if (lv > best) best = lv;
+      }
+    }
+  }
+  return Math.max(0, best) / 15;
+}
+
+function meshChunk(chunk) {
+  const blocks = chunk.blocks;
+  if (!blocks) return null;
+  buildPad(chunk);
+  World.collectEmitters(chunk);
+  computeSkyLight(chunk, blocks);
+  computeBlockLight(chunk, blocks);
+  vbSolid.reset(); vbCut.reset(); vbWater.reset(); vbLava.reset();
+  const yTop = Math.min(chunk.maxY, CFG.chunkY - 1);
+  for (let y = 0; y <= yTop; y++) {
+    for (let z = 0; z < 16; z++) {
+      for (let x = 0; x < 16; x++) {
+        const b = blocks[cidx(x, y, z)];
+        if (b === 0) continue;
+        const def = BLOCKS[b];
+        if (def.render === 'cross') { emitCross(x, y, z, def); continue; }
+        const vb = def.pass === 0 ? vbSolid : (def.pass === 1 ? vbCut : (def.pass === 3 ? vbLava : vbWater));
+        const sideTile = tileUV(def.tiles[2]);
+        for (let f = 0; f < 6; f++) {
+          const F = FACES[f];
+          const n = F.n;
+          const ax = x + n[0], ay = y + n[1], az = z + n[2];
+          const nbx = (ay >= 0 && ay < CFG.chunkY) ? padBlocks[pidx(ax, ay, az)] : 0;
+          if (!faceVisible(b, nbx)) continue;
+          const tuv = f === 0 ? tileUV(def.tiles[0]) : (f === 1 ? tileUV(def.tiles[1]) : sideTile);
+          const shadeBase = CFG.faceShade[f];
+          const airIn = ax >= 0 && ax < 16 && az >= 0 && az < 16 && ay >= 0 && ay < CFG.chunkY;
+          let fbSky, fbBlk;
+          if (airIn) {
+            const fbIdx = cidx(ax, ay, az);
+            fbSky = skyL[fbIdx] * 0.0666667;
+            fbBlk = blkL[fbIdx] * 0.0666667;
+          } else {
+            const gw = chunk.cx * 16 + ax;
+            const gz = chunk.cz * 16 + az;
+            const ncx = gw >> 4, ncz = gz >> 4;
+            const nlx = gw & 15, nlz = gz & 15;
+            let found = false;
+            if (ay >= 0 && ay < CFG.chunkY) {
+              const nch = World.getChunk(ncx, ncz);
+              if (nch && nch.generated && nch.blocks) {
+                const nbid = nch.blocks[nlx | (nlz << 4) | (ay << 8)];
+                if (nbid !== 0 && BLOCKS[nbid].opaque) {
+                  fbSky = 0; fbBlk = 0; found = true;
+                } else {
+                  let lv = 15;
+                  for (let yy = CFG.chunkY - 1; yy > ay; yy--) {
+                    const b2 = nch.blocks[nlx | (nlz << 4) | (yy << 8)];
+                    if (b2 !== 0) {
+                      if (BLOCKS[b2].opaque) { lv = 0; break; }
+                      lv -= ATT[b2];
+                      if (lv <= 0) { lv = 0; break; }
+                    }
+                  }
+                  fbSky = lv / 15;
+                  fbBlk = estimateNeighborBlockLight(nch, nlx, ay, nlz);
+                  found = true;
+                }
+              }
+            }
+            if (!found) {
+              const fbIdx = cidx(x, y, z);
+              fbSky = skyL[fbIdx] * 0.0666667;
+              fbBlk = blkL[fbIdx] * 0.0666667;
+            }
+          }
+          const u = F.u, v = F.v;
+          const wave = ((def.pass === 2 || def.pass === 3) && f === 0) ? 1 : 0;
+          const vIdx = [0, 0, 0, 0];
+          for (let k = 0; k < 4; k++) {
+            const cv = F.verts[k];
+            const tu = F.uv[k];
+            const px = x + cv[0], py = y + cv[1], pz = z + cv[2];
+            const su = PUV[k][0], sv = PUV[k][1];
+            const s1x = ax + u[0] * su, s1y = ay + u[1] * su, s1z = az + u[2] * su;
+            const s2x = ax + v[0] * sv, s2y = ay + v[1] * sv, s2z = az + v[2] * sv;
+            const ccx = s1x + v[0] * sv, ccy = s1y + v[1] * sv, ccz = s1z + v[2] * sv;
+            const o1 = (s1y >= 0 && s1y < CFG.chunkY) ? (BLOCKS[padBlocks[pidx(s1x, s1y, s1z)]].opaque ? 1 : 0) : 1;
+            const o2 = (s2y >= 0 && s2y < CFG.chunkY) ? (BLOCKS[padBlocks[pidx(s2x, s2y, s2z)]].opaque ? 1 : 0) : 1;
+            const oc = (ccy >= 0 && ccy < CFG.chunkY) ? (BLOCKS[padBlocks[pidx(ccx, ccy, ccz)]].opaque ? 1 : 0) : 1;
+            const occ = (o1 && o2) ? 3 : (o1 + o2 + oc);
+            const ao = AO_TABLE[occ];
+            let skySum = 0, blkSum = 0, cnt = 0;
+            sampleLightAt(ax, ay, az, fbSky, fbBlk); skySum += _oSky; blkSum += _oBlk; cnt++;
+            if (!o1) { sampleLightAt(s1x, s1y, s1z, fbSky, fbBlk); skySum += _oSky; blkSum += _oBlk; cnt++; }
+            if (!o2) { sampleLightAt(s2x, s2y, s2z, fbSky, fbBlk); skySum += _oSky; blkSum += _oBlk; cnt++; }
+            if (!oc) { sampleLightAt(ccx, ccy, ccz, fbSky, fbBlk); skySum += _oSky; blkSum += _oBlk; cnt++; }
+            let fs = skySum / cnt, fb = blkSum / cnt;
+            if (fs < 0.01 && fb < 0.01) { fs = 0.045; }
+            vIdx[k] = vb.vert(
+              px, py, pz,
+              lerp(tuv.u0, tuv.u1, tu[0]), lerp(tuv.v0, tuv.v1, tu[1]),
+              fs, fb,
+              shadeBase * ao, wave
+            );
+          }
+          vb.quad(vIdx[0], vIdx[1], vIdx[2], vIdx[3]);
+        }
+      }
+    }
+  }
+  return {
+    solid: vbSolid.n > 0 ? vbSolid.geometry(chunk.maxY) : null,
+    cut: vbCut.n > 0 ? vbCut.geometry(chunk.maxY) : null,
+    water: vbWater.n > 0 ? vbWater.geometry(chunk.maxY) : null,
+    lava: vbLava.n > 0 ? vbLava.geometry(chunk.maxY) : null
+  };
+}
   const blocks = chunk.blocks;
   if (!blocks) return null;
   buildPad(chunk);
@@ -5659,6 +5884,7 @@ const Touch = {
       if (!this.el) { this.build(); this.bindButtons(); }
       this.show();
       Input.locked = true;
+      this.syncButtons();
     } else {
       document.body.classList.remove('touch');
       for (const el of document.querySelectorAll('.touchOnly')) el.style.display = 'none';
@@ -5686,6 +5912,7 @@ const Touch = {
       <div id="mobTop">
         <div class="mbtn" data-act="inv">背包</div>
         <div class="mbtn" data-act="view">视角</div>
+        <div class="mbtn" data-act="mode">模式</div>
         <div class="mbtn" data-act="fly">飞行</div>
         <div class="mbtn" data-act="full">全屏</div>
         <div class="mbtn" data-act="menu">菜单</div>
@@ -5699,6 +5926,15 @@ const Touch = {
       if (!el || !el.closest) return false;
       return !!el.closest('#hotbar') || !!el.closest('#mobileUI');
     } catch (e) { return false; }
+  },
+  syncButtons() {
+    if (!this.el) return;
+    const fb = this.el.querySelector('.mbtn[data-act="fly"]');
+    if (fb) fb.classList.toggle('on', !!Player.flying);
+    const mb = this.el.querySelector('.mbtn[data-act="mode"]');
+    if (mb) mb.classList.toggle('on', Player.mode === 'creative');
+    const sb = this.el.querySelector('.mbtn[data-act="sneak"]');
+    if (sb) sb.classList.toggle('on', !!Input.keys['ShiftLeft']);
   },
   bindCanvas() {
     if (this.canvasBound) return;
@@ -5744,12 +5980,12 @@ const Touch = {
       const len = Math.hypot(dx, dy);
       if (len > max) { dx = dx / len * max; dy = dy / len * max; }
       knob.style.transform = 'translate(' + dx.toFixed(0) + 'px,' + dy.toFixed(0) + 'px)';
-      const nx = dx / max, ny = dy / max, dead = 0.26;
+      const nx = dx / max, ny = dy / max, dead = 0.22;
       Input.keys['KeyW'] = ny < -dead;
       Input.keys['KeyS'] = ny > dead;
       Input.keys['KeyA'] = nx < -dead;
       Input.keys['KeyD'] = nx > dead;
-      Input.keys['ControlLeft'] = Math.hypot(nx, ny) > 0.93;
+      Input.keys['ControlLeft'] = Math.hypot(nx, ny) > 0.92;
     };
     pad.addEventListener('touchstart', (e) => {
       SFX.init(); SFX.resume();
@@ -5805,11 +6041,19 @@ const Touch = {
       else UI.openInv('inv');
     } else if (act === 'view') {
       Game.cycleView();
+    } else if (act === 'mode') {
+      Player.mode = Player.mode === 'creative' ? 'survival' : 'creative';
+      if (Player.mode === 'survival') Player.flying = false;
+      this.syncButtons();
+      toast('切换到' + (Player.mode === 'creative' ? '创造' : '生存') + '模式', 1500);
     } else if (act === 'fly') {
-      if (Player.mode !== 'creative') { toast('切换到创造模式才能飞行（菜单 → G）', 1800); return; }
+      if (Player.mode !== 'creative') {
+        toast('切换到创造模式才能飞行（点「模式」按钮）', 1800);
+        return;
+      }
       Player.flying = !Player.flying;
       Player.vel.y = 0;
-      this.mark('fly', Player.flying);
+      this.syncButtons();
       toast(Player.flying ? '飞行开启' : '飞行关闭', 1000);
     } else if (act === 'full') {
       try {
@@ -6382,12 +6626,36 @@ const Game = {
     this.updateTitleButtons();
     requestAnimationFrame((t) => this.loop(t));
   },
-  onResize() {
+    onResize() {
     const w = Math.max(1, window.innerWidth), h = Math.max(1, window.innerHeight);
     renderer.setSize(w, h, false);
     camera.aspect = w / h; camera.updateProjectionMatrix();
     handCam.aspect = w / h; handCam.updateProjectionMatrix();
     window.__DIAG.info.viewport = { w: w, h: h, dpr: window.devicePixelRatio || 1, bw: canvas.width, bh: canvas.height };
+
+    /* 窄屏标记，供 CSS 使用 */
+    const narrow = w < 560;
+    const ultraNarrow = w < 400;
+    document.body.classList.toggle('narrow', narrow);
+    document.body.classList.toggle('ultra-narrow', ultraNarrow);
+
+    /* 准星窄屏缩放 */
+    const ch = $('crosshair');
+    if (ch) {
+      const s = ultraNarrow ? 0.78 : (narrow ? 0.88 : 1);
+      ch.style.transform = 'translate(-50%,-50%) scale(' + s + ')';
+    }
+
+    /* 非触屏窄屏时，快捷栏上抬一点 */
+    if (!Input.touchMode) {
+      const hb = $('hotbar');
+      if (hb) hb.style.bottom = narrow ? '6px' : '8px';
+    }
+
+    /* 尺寸变化后，触屏按钮状态重绘一次 */
+    if (typeof Touch !== 'undefined' && Touch.el) {
+      Touch.syncButtons();
+    }
   },
   updateTitleButtons() {
     const hasSave = Save.has();
