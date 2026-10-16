@@ -2079,7 +2079,6 @@ function buildPad(chunk) {
   }
   return padY;
 }
-function meshChunk(chunk) {
   function estimateNeighborBlockLight(nch, lx, y, lz) {
   const wx = nch.cx * 16 + lx;
   const wz = nch.cz * 16 + lz;
@@ -2195,112 +2194,6 @@ function meshChunk(chunk) {
               px, py, pz,
               lerp(tuv.u0, tuv.u1, tu[0]), lerp(tuv.v0, tuv.v1, tu[1]),
               fs, fb,
-              shadeBase * ao, wave
-            );
-          }
-          vb.quad(vIdx[0], vIdx[1], vIdx[2], vIdx[3]);
-        }
-      }
-    }
-  }
-  return {
-    solid: vbSolid.n > 0 ? vbSolid.geometry(chunk.maxY) : null,
-    cut: vbCut.n > 0 ? vbCut.geometry(chunk.maxY) : null,
-    water: vbWater.n > 0 ? vbWater.geometry(chunk.maxY) : null,
-    lava: vbLava.n > 0 ? vbLava.geometry(chunk.maxY) : null
-  };
-}
-  const blocks = chunk.blocks;
-  if (!blocks) return null;
-  buildPad(chunk);
-  World.collectEmitters(chunk);
-  computeSkyLight(chunk, blocks);
-  computeBlockLight(chunk, blocks);
-  vbSolid.reset(); vbCut.reset(); vbWater.reset(); vbLava.reset();
-  const yTop = Math.min(chunk.maxY, CFG.chunkY - 1);
-  for (let y = 0; y <= yTop; y++) {
-    for (let z = 0; z < 16; z++) {
-      for (let x = 0; x < 16; x++) {
-        const b = blocks[cidx(x, y, z)];
-        if (b === 0) continue;
-        const def = BLOCKS[b];
-        if (def.render === 'cross') { emitCross(x, y, z, def); continue; }
-        const vb = def.pass === 0 ? vbSolid : (def.pass === 1 ? vbCut : (def.pass === 3 ? vbLava : vbWater));
-        const sideTile = tileUV(def.tiles[2]);
-        for (let f = 0; f < 6; f++) {
-          const F = FACES[f];
-          const n = F.n;
-          const ax = x + n[0], ay = y + n[1], az = z + n[2];
-          const nbx = (ay >= 0 && ay < CFG.chunkY) ? padBlocks[pidx(ax, ay, az)] : 0;
-          if (!faceVisible(b, nbx)) continue;
-          const tuv = f === 0 ? tileUV(def.tiles[0]) : (f === 1 ? tileUV(def.tiles[1]) : sideTile);
-          const shadeBase = CFG.faceShade[f];
-          const airIn = ax >= 0 && ax < 16 && az >= 0 && az < 16 && ay >= 0 && ay < CFG.chunkY;
-          let fbSky, fbBlk;
-          if (airIn) {
-            const fbIdx = cidx(ax, ay, az);
-            fbSky = skyL[fbIdx] * 0.0666667;
-            fbBlk = blkL[fbIdx] * 0.0666667;
-          } else {
-            const gw = chunk.cx * 16 + ax;
-            const gz = chunk.cz * 16 + az;
-            const ncx = gw >> 4, ncz = gz >> 4;
-            const nlx = gw & 15, nlz = gz & 15;
-            let found = false;
-            if (ay >= 0 && ay < CFG.chunkY) {
-              const nch = World.getChunk(ncx, ncz);
-              if (nch && nch.generated && nch.blocks) {
-                const nbid = nch.blocks[nlx | (nlz << 4) | (ay << 8)];
-                if (nbid !== 0 && BLOCKS[nbid].opaque) {
-                  fbSky = 0; fbBlk = 0; found = true;
-                } else {
-                  /* 用邻居列从顶往下算天空光 */
-                  let lv = 15;
-                  for (let yy = CFG.chunkY - 1; yy > ay; yy--) {
-                    const b2 = nch.blocks[nlx | (nlz << 4) | (yy << 8)];
-                    if (b2 !== 0) {
-                      if (BLOCKS[b2].opaque) { lv = 0; break; }
-                      lv -= ATT[b2];
-                      if (lv <= 0) { lv = 0; break; }
-                    }
-                  }
-                  fbSky = lv / 15;
-                  fbBlk = 0;
-                  found = true;
-                }
-              }
-            }
-            if (!found) {
-              const fbIdx = cidx(x, y, z);
-              fbSky = skyL[fbIdx] * 0.0666667;
-              fbBlk = blkL[fbIdx] * 0.0666667;
-            }
-          }
-          const u = F.u, v = F.v;
-          const wave = ((def.pass === 2 || def.pass === 3) && f === 0) ? 1 : 0;
-          const vIdx = [0, 0, 0, 0];
-          for (let k = 0; k < 4; k++) {
-            const cv = F.verts[k];
-            const tu = F.uv[k];
-            const px = x + cv[0], py = y + cv[1], pz = z + cv[2];
-            const su = PUV[k][0], sv = PUV[k][1];
-            const s1x = ax + u[0] * su, s1y = ay + u[1] * su, s1z = az + u[2] * su;
-            const s2x = ax + v[0] * sv, s2y = ay + v[1] * sv, s2z = az + v[2] * sv;
-            const ccx = s1x + v[0] * sv, ccy = s1y + v[1] * sv, ccz = s1z + v[2] * sv;
-            const o1 = (s1y >= 0 && s1y < CFG.chunkY) ? (BLOCKS[padBlocks[pidx(s1x, s1y, s1z)]].opaque ? 1 : 0) : 1;
-            const o2 = (s2y >= 0 && s2y < CFG.chunkY) ? (BLOCKS[padBlocks[pidx(s2x, s2y, s2z)]].opaque ? 1 : 0) : 1;
-            const oc = (ccy >= 0 && ccy < CFG.chunkY) ? (BLOCKS[padBlocks[pidx(ccx, ccy, ccz)]].opaque ? 1 : 0) : 1;
-            const occ = (o1 && o2) ? 3 : (o1 + o2 + oc);
-            const ao = AO_TABLE[occ];
-            let skySum = 0, blkSum = 0, cnt = 0;
-            sampleLightAt(ax, ay, az, fbSky, fbBlk); skySum += _oSky; blkSum += _oBlk; cnt++;
-            if (!o1) { sampleLightAt(s1x, s1y, s1z, fbSky, fbBlk); skySum += _oSky; blkSum += _oBlk; cnt++; }
-            if (!o2) { sampleLightAt(s2x, s2y, s2z, fbSky, fbBlk); skySum += _oSky; blkSum += _oBlk; cnt++; }
-            if (!oc) { sampleLightAt(ccx, ccy, ccz, fbSky, fbBlk); skySum += _oSky; blkSum += _oBlk; cnt++; }
-            vIdx[k] = vb.vert(
-              px, py, pz,
-              lerp(tuv.u0, tuv.u1, tu[0]), lerp(tuv.v0, tuv.v1, tu[1]),
-              skySum / cnt, blkSum / cnt,
               shadeBase * ao, wave
             );
           }
@@ -2922,7 +2815,7 @@ const Player = {
     if (this.mode === 'creative' && this.flying) {
       let vy = 0;
       if (Input.key('Space')) vy += speed;
-      if (this.sneaking) vy -= speed;
+      if (this.sneaking) vy -= speed * 3.0;
       this.vel.y = lerp(this.vel.y, vy, clamp(12 * dt, 0, 1));
     } else if (this.inWater) {
       this.vel.y -= CFG.gravity * 0.28 * dt;
@@ -3468,7 +3361,7 @@ const Interaction = {
     if (def.use === 'chest') Chests.remove(x, y, z);
     if (!creative) {
       let dropId = blockDrop(id, heldId);
-      if (id === B.gravel && dropId) dropId = Math.random() < 0.12 ? I.flint : B.gravel;
+      if (id === B.gravel) dropId = Math.random() < 0.12 ? I.flint : B.gravel;
       else if (id === B.leaves && Math.random() < 0.06) dropId = I.apple;
       if (dropId) Drops.spawn(dropId, 1, x + 0.5, y + 0.45, z + 0.5, (Math.random() - 0.5) * 1.4, 1.8, (Math.random() - 0.5) * 1.4);
       if (itemDurability(heldId) > 0) Inv.damageSel(1);
@@ -3501,7 +3394,6 @@ const Interaction = {
     this.eatTime = 0;
   },
     place() {
-    if (this.placeCooldown > 0) return;
     const s = Inv.held();
     if (!s) return;
 
@@ -3666,7 +3558,7 @@ function itemHeal(id) { return id >= ITEM_BASE ? (ItemDefs[id].heal || 0) : 0; }
 function itemDmg(id) { return id >= ITEM_BASE ? ItemDefs[id].dmg : 1; }
 function isBlockItem(id) { return id > 0 && id < ITEM_BASE; }
 const FUEL = {};
-FUEL[B.planks] = 15; FUEL[B.log] = 15; FUEL[B.crafting_table] = 15; FUEL[B.cobblestone] = 0;
+FUEL[B.planks] = 15; FUEL[B.log] = 15; FUEL[B.crafting_table] = 15;
 function itemFuel(id) { return id >= ITEM_BASE ? (ItemDefs[id].fuel || 0) : (FUEL[id] || 0); }
 function blockDrop(id, heldId) {
   const d = BLOCKS[id];
@@ -4642,9 +4534,6 @@ const Boats = {
 
       // 船体 AABB：宽 1.5，高 0.5，中心在 pos
       const hw = 0.75;
-      const bodyBottom = b.pos.y - 0.15;
-      const bodyTop = b.pos.y + 0.45;
-      const solidAt = (x, y, z) => World.isSolid(Math.floor(x), Math.floor(y), Math.floor(z));
       const boxHit = (cx, cy, cz) => {
         const x0 = Math.floor(cx - hw + 1e-5), x1 = Math.floor(cx + hw - 1e-5);
         const y0 = Math.floor(cy - 0.15 + 1e-5), y1 = Math.floor(cy + 0.45 - 1e-5);
@@ -5162,6 +5051,7 @@ class Mob {
     else if (this.type.hostile) this.fleeTimer = 0;
   }
   die() {
+    if (this.dead) return;
     this.dead = true;
     Particles.burst(this.pos.x, this.pos.y + this.type.h * 0.5, this.pos.z, T.item_bone, 12, 3, 0.1, 0.7);
     for (const d of this.type.drops) {
@@ -6448,15 +6338,7 @@ const Save = {
     if (!Array.isArray(d.mods)) d.mods = [];
     const p = d.player;
     if (typeof p.x !== 'number' || typeof p.y !== 'number' || typeof p.z !== 'number') return false;
-    if (!Array.isArray(p.inv)) {
-      if (Array.isArray(p.hotbar)) {
-        p.inv = [];
-        for (let i = 0; i < 36; i++) {
-          const v = p.hotbar[i];
-          p.inv.push((typeof v === 'number' && v > 0) ? [v, 64, -1] : 0);
-        }
-      } else p.inv = [];
-    }
+    if (!Array.isArray(p.inv)) p.inv = [];
     if (!Array.isArray(d.furnaces)) d.furnaces = [];
     if (!Array.isArray(d.chests)) d.chests = [];
     if (!Array.isArray(d.boats)) d.boats = [];
@@ -6606,7 +6488,7 @@ const Game = {
   chunkList: [], listCX: 1e9, listCZ: 1e9, listR: -1,
   forceChunkRefresh: false,
   pendingSave: null,
-  lastTime: 0, autosaveTimer: 0, needPointerHint: false,
+  lastTime: 0, needPointerHint: false,
   init() {
     Input.init();
     Save.loadSettings();
@@ -7408,7 +7290,6 @@ const Game = {
             Input.consumeMouseDelta();
           }
           HUD.update(dt);
-          this.autosaveTimer += dt;
         } else {
           HUD.update(0);
           Particles.update(0);
