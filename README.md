@@ -386,7 +386,7 @@
 
 ### 清除数据
 
-设置 → **清除所有数据…**：删除 localStorage、sessionStorage、IndexedDB、Cache Storage、Service Worker，然后自动刷新页面。
+设置 → **清除所有数据…** ：删除 localStorage、sessionStorage、IndexedDB、Cache Storage、Service Worker，然后自动刷新页面。
 
 **此操作不可撤销。**
 
